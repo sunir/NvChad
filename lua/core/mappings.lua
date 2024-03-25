@@ -1,7 +1,5 @@
 -- n, v, i, t = mode names
 
-print('mappings.lua')
-
 local M = {}
 
 M.general = {
