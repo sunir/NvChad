@@ -80,6 +80,11 @@ vim.schedule(function()
   end
   vim.api.nvim_set_keymap('n', '<C-A-k>', '<cmd>lua custom_tabufline_move_prev()<CR>', {noremap = true, silent = true})
 
+  function _G.custom_tabufline_close_all()
+    require("nvchad.tabufline").closeAllBufs()
+  end
+  vim.api.nvim_set_keymap('n', '<leader>X', '<cmd>lua custom_tabufline_close_all()<CR>', {noremap = true, silent = true})
+
   vim.keymap.del('n', '<leader>e')
   vim.api.nvim_set_keymap('n', '<leader>e', '<cmd> NvimTreeFindFile <CR>', {noremap = true, silent = true})
 
