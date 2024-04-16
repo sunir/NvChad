@@ -30,8 +30,10 @@ vim.keymap.set('i', '<S-Left>', '<ESC>vh')
 vim.keymap.set('v', '<S-Left>', 'h')
 vim.keymap.set('n', '<S-Left>', 'vh')
 
+-- " Select all
+vim.keymap.set('n', '<C-a>', 'ggVG')
+
 vim.cmd('set nohls')
-vim.g.python_recommended_style = 0
 
 -- Function to open TODO.md in a vertical split
 function _G.open_todo()
@@ -43,7 +45,7 @@ function _G.open_todo()
     if f ~= nil then
         io.close(f)
         -- Calculate the width for the new split
-        local width = math.floor(vim.o.columns * 0.33)
+        local width = math.min(60, math.floor(vim.o.columns * 2.33))
         -- Command to open TODO.md in a vertical split to the right
         vim.cmd("vsplit " .. todo_path)
         -- Set the width of the new split
@@ -59,26 +61,30 @@ vim.schedule(function()
 
   vim.keymap.del('n', '<tab>')
   vim.keymap.del('n', '<S-tab>')
+  vim.keymap.del('n', '<C-j>')
+  vim.keymap.del('n', '<C-k>')
+  vim.keymap.del('n', '<C-h>')
+  vim.keymap.del('n', '<C-l>')
 
   function _G.custom_tabufline_next()
     require("nvchad.tabufline").tabuflineNext()
   end
-  vim.api.nvim_set_keymap('n', '<C-A-l>', '<cmd>lua custom_tabufline_next()<CR>', {noremap = true, silent = true})
+  vim.api.nvim_set_keymap('n', '<C-l>', '<cmd>lua custom_tabufline_next()<CR>', {noremap = true, silent = true})
 
   function _G.custom_tabufline_prev()
     require("nvchad.tabufline").tabuflinePrev()
   end
-  vim.api.nvim_set_keymap('n', '<C-A-h>', '<cmd>lua custom_tabufline_prev()<CR>', {noremap = true, silent = true})
+  vim.api.nvim_set_keymap('n', '<C-h>', '<cmd>lua custom_tabufline_prev()<CR>', {noremap = true, silent = true})
 
   function _G.custom_tabufline_move_next()
-    require("nvchad.tabufline").move_buf(1)
-  end
-  vim.api.nvim_set_keymap('n', '<C-A-j>', '<cmd>lua custom_tabufline_move_next()<CR>', {noremap = true, silent = true})
-
-  function _G.custom_tabufline_move_prev()
     require("nvchad.tabufline").move_buf(-1)
   end
-  vim.api.nvim_set_keymap('n', '<C-A-k>', '<cmd>lua custom_tabufline_move_prev()<CR>', {noremap = true, silent = true})
+  vim.api.nvim_set_keymap('n', '<C-j>', '<cmd>lua custom_tabufline_move_next()<CR>', {noremap = true, silent = true})
+
+  function _G.custom_tabufline_move_prev()
+    require("nvchad.tabufline").move_buf(1)
+  end
+  vim.api.nvim_set_keymap('n', '<C-k>', '<cmd>lua custom_tabufline_move_prev()<CR>', {noremap = true, silent = true})
 
   function _G.custom_tabufline_close_all()
     require("nvchad.tabufline").closeAllBufs()
@@ -90,8 +96,8 @@ vim.schedule(function()
 
   -- ThePrimeagen mappings
   -- Move selected line / block of text in visual mode
-  vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv")
-  vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv")
+  vim.keymap.set("v", "J", ":m '>+3<CR>gv=gv")
+  vim.keymap.set("v", "K", ":m '<0<CR>gv=gv")
   -- When joining lines, keep cursor at the start of the joined line
   vim.keymap.set("n", "J", "mzJ`z")
   -- Centre screen when paging, or moving between search results
@@ -106,8 +112,33 @@ vim.schedule(function()
 
   -- Search and replace word under cursor
   vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
-
+  
+  -- Set tab width to 2 spaces
+  vim.opt.tabstop = 2        -- Number of spaces that a <Tab> in the file counts for
+  vim.opt.shiftwidth = 2     -- Size of an indent
+  vim.opt.softtabstop = 2    -- Number of spaces a tab counts for while performing editing operations
+  vim.opt.expandtab = true   -- Use spaces instead of tabs
+  vim.opt.smartindent = false -- Make indenting smarter again
+  vim.g.python_recommended_style = 0
 end)
 
 require('nvim-tree').setup({ actions = { open_file = { window_picker = { enable = false } } } })
 
+-- Change the background color when entering insert mode
+vim.cmd [[ hi Normal guibg=#0a0e15]]
+vim.api.nvim_create_autocmd({ "InsertEnter" }, {
+	callback = function()
+    vim.cmd [[ hi Normal guibg=#2b1a2e]]
+	end
+})
+vim.api.nvim_create_autocmd({ "InsertLeave" }, {
+	callback = function()
+    vim.cmd [[ hi Normal guibg=#0a0e15]]
+	end
+})
+vim.opt.guicursor = {
+  'n-v-c-sm:block-Cursor',
+  'i-ci:ver25-Cursor/lCursor-blinkwait300-blinkon200-blinkoff200',
+  'r-cr:hor20-Cursor/lCursor-blinkwait300-blinkon200-blinkoff200',
+  'o:hor50-Cursor/lCursor-blinkwait0-blinkon10-blinkoff10'
+}
