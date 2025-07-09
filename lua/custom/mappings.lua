@@ -74,17 +74,6 @@ M.general = {
     -- Search and replace word under cursor
     ["<leader>s"] = { [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]], "Search & replace word under cursor" },
 
-    -- Telescope frecency
-    ["<leader>fr"] = { "<cmd>Telescope frecency<cr>", "Find recent/frequent files" },
-
-    -- Inc-rename
-    ["<leader>rn"] = {
-      function()
-        return ":IncRename " .. vim.fn.expand("<cword>")
-      end,
-      "Rename with preview",
-      opts = { expr = true }
-    },
 
     -- Shift arrows to select
     ["<S-Down>"] = { "vj", "Select down" },

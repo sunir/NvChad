@@ -100,38 +100,6 @@ local plugins = {
       }
     end
   },
-
-  -- 1. Telescope frecency - find files by frequency/recency
-  {
-    "nvim-telescope/telescope-frecency.nvim",
-    dependencies = { "nvim-telescope/telescope.nvim" },
-    config = function()
-      require("telescope").load_extension("frecency")
-    end,
-  },
-
-  -- 2. Flash.nvim - jump to any text with 2 chars
-  {
-    "folke/flash.nvim",
-    event = "VeryLazy",
-    opts = {},
-    keys = {
-      { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end, desc = "Flash jump" },
-      { "S", mode = { "n", "x", "o" }, function() require("flash").treesitter() end, desc = "Flash Treesitter" },
-      { "r", mode = "o", function() require("flash").remote() end, desc = "Remote Flash" },
-      { "R", mode = { "o", "x" }, function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
-      { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
-    },
-  },
-
-  -- 4. Inc-rename - preview rename changes live
-  {
-    "smjonas/inc-rename.nvim",
-    cmd = "IncRename",
-    config = function()
-      require("inc-rename").setup()
-    end,
-  },
 }
 
 return plugins
