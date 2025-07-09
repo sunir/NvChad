@@ -79,6 +79,17 @@ local options = {
       behavior = cmp.ConfirmBehavior.Insert,
       select = true,
     },
+    ["<C-y>"] = cmp.mapping(function(fallback)
+      if cmp.visible() and cmp.get_selected_entry() then
+        cmp.confirm({ select = true })
+      elseif require("luasnip").expandable() then
+        require("luasnip").expand()
+      elseif require("luasnip").expand_or_jumpable() then
+        require("luasnip").expand_or_jump()
+      else
+        fallback()
+      end
+    end, { "i", "s" }),
     -- ["<Tab>"] = cmp.mapping(function(fallback)
     --   if cmp.visible() then
     --     cmp.select_next_item()

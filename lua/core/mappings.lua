@@ -306,7 +306,13 @@ M.nvterm = {
 
     ["<A-h>"] = {
       function()
-        require("nvterm.terminal").toggle "horizontal"
+        -- Try to toggle, but if it fails, just close the window
+        local ok, err = pcall(function()
+          require("nvterm.terminal").toggle "horizontal"
+        end)
+        if not ok then
+          vim.cmd("close")
+        end
       end,
       "Toggle horizontal term",
     },
