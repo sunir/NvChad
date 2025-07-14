@@ -120,28 +120,30 @@ local plugins = {
   -- Override nvim-cmp to use C-i instead of C-y
   {
     "hrsh7th/nvim-cmp",
+    dependencies = {
+      {
+        "L3MON4D3/LuaSnip",
+        config = function(_, opts)
+          require("plugins.configs.others").luasnip(opts)
+        end,
+      },
+    },
     opts = function()
+      local M = require "plugins.configs.cmp"
       local cmp = require("cmp")
-      return {
-        completion = {
-          completeopt = "menu,menuone,noselect",
-          -- Enable autocomplete
-          autocomplete = { cmp.TriggerEvent.TextChanged },
-        },
-        mapping = {
-          ["<C-i>"] = cmp.mapping(function(fallback)
-            if cmp.visible() and cmp.get_selected_entry() then
-              cmp.confirm({ select = true })
-            elseif require("luasnip").expandable() then
-              require("luasnip").expand()
-            elseif require("luasnip").expand_or_jumpable() then
-              require("luasnip").expand_or_jump()
-            else
-              fallback()
-            end
-          end, { "i", "s" }),
-        },
-      }
+      M.completion.completeopt = "menu,menuone,noselect"
+      M.mapping["<C-i>"] = cmp.mapping(function(fallback)
+        if cmp.visible() and cmp.get_selected_entry() then
+          cmp.confirm({ select = true })
+        elseif require("luasnip").expandable() then
+          require("luasnip").expand()
+        elseif require("luasnip").expand_or_jumpable() then
+          require("luasnip").expand_or_jump()
+        else
+          fallback()
+        end
+      end, { "i", "s" })
+      return M
     end,
   },
 }
