@@ -23,7 +23,11 @@ end
 -- check core.mappings for table structure
 M.mappings = require "custom.mappings"
 
-vim.api.nvim_set_hl(0, "Comment", { fg = "#888888"})
+vim.api.nvim_set_hl(0, "Comment", { fg = "#AAAAAA"})
 vim.api.nvim_set_hl(0, "@comment", { link = "Comment"})
+
+-- Copilot suggestion colors (dark red)
+vim.api.nvim_set_hl(0, "CopilotSuggestion", { fg = "#A05555", italic = true })
+vim.api.nvim_set_hl(0, "CopilotAnnotation", { fg = "#A05555" })
 
 return M
