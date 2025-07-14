@@ -50,13 +50,15 @@ local plugins = {
   {
     "github/copilot.vim",
     lazy = false,
-    -- config = function()  -- Mapping tab is already used by NvChad
-    --   vim.g.copilot_no_tab_map = true;
-    --   vim.g.copilot_assume_mapped = true;
-    --   vim.g.copilot_tab_fallback = "";
-    -- The mapping is set to other key, see custom/lua/mappings
-    -- or run <leader>ch to see copilot mapping section
-    -- end
+    config = function()
+      -- Disable default Tab mapping
+      vim.g.copilot_no_tab_map = true
+      -- Map Copilot accept to C-i
+      vim.keymap.set('i', '<C-i>', 'copilot#Accept("\\<CR>")', {
+        expr = true,
+        replace_keycodes = false
+      })
+    end,
   },
 
   {
@@ -113,6 +115,34 @@ local plugins = {
       { "R", mode = { "o", "x" }, function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
       { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
     },
+  },
+
+  -- Override nvim-cmp to use C-i instead of C-y
+  {
+    "hrsh7th/nvim-cmp",
+    opts = function()
+      local cmp = require("cmp")
+      return {
+        completion = {
+          completeopt = "menu,menuone,noselect",
+          -- Enable autocomplete
+          autocomplete = { cmp.TriggerEvent.TextChanged },
+        },
+        mapping = {
+          ["<C-i>"] = cmp.mapping(function(fallback)
+            if cmp.visible() and cmp.get_selected_entry() then
+              cmp.confirm({ select = true })
+            elseif require("luasnip").expandable() then
+              require("luasnip").expand()
+            elseif require("luasnip").expand_or_jumpable() then
+              require("luasnip").expand_or_jump()
+            else
+              fallback()
+            end
+          end, { "i", "s" }),
+        },
+      }
+    end,
   },
 }
 

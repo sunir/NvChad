@@ -14,6 +14,12 @@ M.ui = {
 
 M.plugins = "custom.plugins"
 
+function M.polish()
+  -- Enable Python 3 provider
+  vim.g.loaded_python3_provider = nil
+  vim.g.python3_host_prog = "~/.venvs/nvim/bin/python3"
+end
+
 -- check core.mappings for table structure
 M.mappings = require "custom.mappings"
 
