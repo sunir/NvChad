@@ -34,10 +34,10 @@ M.general = {
     ["<leader>rn"] = { "<cmd> set rnu! <CR>", "Toggle relative number" },
 
     -- quickfix navigation
-    ["<leader>qj"] = { "<cmd> cnext <CR>", "Next quickfix item" },
-    ["<leader>qk"] = { "<cmd> cprev <CR>", "Previous quickfix item" },
-    ["<leader>qo"] = { "<cmd> copen <CR>", "Open quickfix list" },
-    ["<leader>qc"] = { "<cmd> cclose <CR>", "Close quickfix list" },
+    ["<leader>lj"] = { "<cmd> cnext <CR>", "Next quickfix item" },
+    ["<leader>lk"] = { "<cmd> cprev <CR>", "Previous quickfix item" },
+    ["<leader>lo"] = { "<cmd> copen <CR>", "Open quickfix list" },
+    ["<leader>lc"] = { "<cmd> cclose <CR>", "Close quickfix list" },
 
     -- Allow moving the cursor through wrapped lines with j, k, <Up> and <Down>
     -- http://www.reddit.com/r/vim/comments/2k4cbr/problem_with_gj_and_gk/
@@ -220,7 +220,7 @@ M.lspconfig = {
       "Goto next",
     },
 
-    ["<leader>qe"] = {
+    ["<leader>le"] = {
       function()
         vim.diagnostic.setloclist()
       end,
