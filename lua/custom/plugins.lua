@@ -132,17 +132,8 @@ local plugins = {
       local M = require "plugins.configs.cmp"
       local cmp = require("cmp")
       M.completion.completeopt = "menu,menuone,noselect"
-      M.mapping["<C-i>"] = cmp.mapping(function(fallback)
-        if cmp.visible() and cmp.get_selected_entry() then
-          cmp.confirm({ select = true })
-        elseif require("luasnip").expandable() then
-          require("luasnip").expand()
-        elseif require("luasnip").expand_or_jumpable() then
-          require("luasnip").expand_or_jump()
-        else
-          fallback()
-        end
-      end, { "i", "s" })
+      -- Removed C-i mapping to let Copilot use it
+      -- Use C-y or C-CR to accept cmp suggestions
       return M
     end,
   },
