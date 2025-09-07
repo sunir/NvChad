@@ -6,7 +6,8 @@ local M = {}
 -- Global state for the sidebar
 local sidebar_bufnr = nil
 local sidebar_winid = nil
-local current_state = 'menu'  -- 'menu' or 'content'
+local main_bufnr = nil  -- Store the main buffer we're analyzing
+local current_state = 'structure'
 local current_line = 1
 
 -- Create or toggle the story explorer sidebar
@@ -16,7 +17,10 @@ function M.toggle_sidebar()
     vim.api.nvim_win_close(sidebar_winid, true)
     sidebar_winid = nil
     sidebar_bufnr = nil
+    main_bufnr = nil
   else
+    -- Store current buffer before creating sidebar
+    main_bufnr = vim.api.nvim_get_current_buf()
     -- Create new sidebar
     M.create_sidebar()
   end
@@ -120,10 +124,13 @@ end
 function M.show_code_structure()
   current_state = 'structure'
   
-  -- Get current buffer info
-  local current_buf = vim.api.nvim_get_current_buf()
-  local filename = vim.api.nvim_buf_get_name(current_buf)
-  local content = table.concat(vim.api.nvim_buf_get_lines(current_buf, 0, -1, false), '\n')
+  -- Use the stored main buffer
+  if not main_bufnr or not vim.api.nvim_buf_is_valid(main_bufnr) then
+    main_bufnr = vim.api.nvim_get_current_buf()
+  end
+  
+  local filename = vim.api.nvim_buf_get_name(main_bufnr)
+  local content = table.concat(vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false), '\n')
   
   -- Parse based on file extension
   local display_lines = {}
@@ -199,13 +206,15 @@ function M.select_item()
     
     -- Extract line number from "(L123)" format
     local line_num = line:match('%(L(%d+)%)')
-    if line_num then
-      -- Jump to the line in the main buffer
-      local main_win = vim.fn.winnr('#')
-      if main_win ~= vim.fn.winnr() then
-        vim.cmd('wincmd p')  -- Go to previous window (main buffer)
-        vim.api.nvim_win_set_cursor(0, {tonumber(line_num), 0})
-        vim.cmd('normal! zz')  -- Center the line
+    if line_num and main_bufnr then
+      -- Find window containing the main buffer
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_get_buf(win) == main_bufnr then
+          vim.api.nvim_set_current_win(win)
+          vim.api.nvim_win_set_cursor(win, {tonumber(line_num), 0})
+          vim.cmd('normal! zz')  -- Center the line
+          break
+        end
       end
     end
   end
