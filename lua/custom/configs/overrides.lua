@@ -12,12 +12,27 @@ M.treesitter = {
     "c",
     "markdown",
     "markdown_inline",
+    "python",
+    "json",
+    "yaml",
+    "bash",
+    "jsdoc",
+    "comment",
   },
   indent = {
     enable = true,
     -- disable = {
     --   "python"
     -- },
+  },
+  incremental_selection = {
+    enable = true,
+    keymaps = {
+      init_selection = "<C-space>",
+      node_incremental = "<C-space>",
+      scope_incremental = "<nop>",
+      node_decremental = "<bs>",
+    },
   },
 }
 
@@ -40,6 +55,16 @@ M.mason = {
 
     -- shell stuff
     "shfmt",
+
+    -- python stuff
+    "pyright",
+
+    -- json/yaml stuff
+    "json-lsp",
+    "yaml-language-server",
+
+    -- markdown stuff
+    "marksman",
   },
 }
 

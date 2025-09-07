@@ -29,6 +29,38 @@ local plugins = {
     opts = overrides.nvimtree,
   },
 
+  -- Better diagnostics UI
+  {
+    "folke/trouble.nvim",
+    cmd = { "TroubleToggle", "Trouble" },
+    keys = {
+      { "<leader>xx", "<cmd>TroubleToggle<cr>", desc = "Toggle Trouble" },
+      { "<leader>xd", "<cmd>TroubleToggle document_diagnostics<cr>", desc = "Document diagnostics" },
+      { "<leader>xw", "<cmd>TroubleToggle workspace_diagnostics<cr>", desc = "Workspace diagnostics" },
+    },
+    config = function()
+      require("trouble").setup()
+    end,
+  },
+
+  -- Multi-cursor editing
+  {
+    "mg979/vim-visual-multi",
+    lazy = false,
+  },
+
+  -- Superior search/replace
+  {
+    "nvim-pack/nvim-spectre",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    keys = {
+      { "<leader>S", function() require("spectre").open() end, desc = "Replace in files (Spectre)" },
+    },
+    config = function()
+      require("spectre").setup()
+    end,
+  },
+
   -- Install a plugin
   {
     "max397574/better-escape.nvim",

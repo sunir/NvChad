@@ -120,6 +120,12 @@ vim.schedule(function()
   vim.opt.expandtab = true   -- Use spaces instead of tabs
   vim.opt.smartindent = false -- Make indenting smarter again
   vim.g.python_recommended_style = 0
+  
+  -- Code folding with Treesitter
+  vim.opt.foldmethod = "expr"
+  vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+  vim.opt.foldenable = false  -- Start with folds open
+  vim.opt.foldlevel = 99      -- Don't fold by default
 end)
 
 require('nvim-tree').setup({ actions = { open_file = { window_picker = { enable = false } } } })
@@ -189,3 +195,6 @@ require('gitsigns').setup{
     -- map({'o', 'x'}, 'ih', ':<C-U>Gitsigns select_hunk<CR>')
   end
 }
+
+-- Initialize Story Explorer plugin
+require('custom.story-explorer').setup()

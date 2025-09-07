@@ -12,6 +12,13 @@ M.general = {
       end,
       "formatting",
     },
+    
+    ["<leader>C"] = {
+      function()
+        vim.lsp.buf.code_action()
+      end,
+      "Code actions",
+    },
 
     -- Select all
     ["<C-a>"] = { "ggVG", "Select all text" },
