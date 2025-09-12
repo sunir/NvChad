@@ -77,11 +77,13 @@ function M.create_sidebar()
   -- Create a new buffer
   sidebar_bufnr = vim.api.nvim_create_buf(false, true)
   
-  -- Set buffer options
+  -- Set buffer options (following nvim-tree pattern for tab hiding)
   vim.api.nvim_buf_set_option(sidebar_bufnr, 'buftype', 'nofile')
+  vim.api.nvim_buf_set_option(sidebar_bufnr, 'buflisted', false)  -- Hide from buffer list/tabs
   vim.api.nvim_buf_set_option(sidebar_bufnr, 'swapfile', false)
   vim.api.nvim_buf_set_option(sidebar_bufnr, 'bufhidden', 'wipe')
   vim.api.nvim_buf_set_option(sidebar_bufnr, 'filetype', 'story-explorer')
+  vim.api.nvim_buf_set_option(sidebar_bufnr, 'modifiable', false)
   
   -- Get current window width
   local width = vim.api.nvim_get_option('columns')
@@ -107,57 +109,8 @@ function M.create_sidebar()
   -- Set initial content (code structure)
   M.show_code_structure()
   
-  -- Protect sidebar window from having other buffers loaded into it
-  vim.api.nvim_create_autocmd({'BufEnter', 'WinEnter'}, {
-    callback = function()
-      -- Early exit if sidebar is not valid
-      if not sidebar_winid or not vim.api.nvim_win_is_valid(sidebar_winid) or
-         not sidebar_bufnr or not vim.api.nvim_buf_is_valid(sidebar_bufnr) then
-        return
-      end
-      
-      local current_win = vim.api.nvim_get_current_win()
-      local current_buf = vim.api.nvim_get_current_buf()
-      
-      -- If we're in the sidebar window but not with the sidebar buffer
-      if current_win == sidebar_winid and current_buf ~= sidebar_bufnr then
-        debug_log('Preventing buffer ' .. current_buf .. ' from loading in sidebar window')
-        
-        -- Find a main window to put the buffer in
-        local main_win = nil
-        for _, win in ipairs(vim.api.nvim_list_wins()) do
-          if win ~= sidebar_winid and vim.api.nvim_win_is_valid(win) then
-            main_win = win
-            break
-          end
-        end
-        
-        if main_win then
-          -- Move to main window and show the buffer there
-          vim.api.nvim_set_current_win(main_win)
-          vim.api.nvim_win_set_buf(main_win, current_buf)
-        else
-          -- Create a new window for the buffer
-          vim.cmd('wincmd p')
-          if vim.api.nvim_get_current_win() == sidebar_winid then
-            -- Still in sidebar, force create a split
-            vim.cmd('split')
-          end
-          vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), current_buf)
-        end
-        
-        -- Restore sidebar buffer to sidebar window (if still valid)
-        if sidebar_bufnr and vim.api.nvim_buf_is_valid(sidebar_bufnr) and
-           sidebar_winid and vim.api.nvim_win_is_valid(sidebar_winid) then
-          vim.api.nvim_win_set_buf(sidebar_winid, sidebar_bufnr)
-        else
-          -- Sidebar buffer or window is invalid, close sidebar
-          debug_log('Sidebar buffer/window invalid during protection, closing sidebar')
-          M.close_sidebar()
-        end
-      end
-    end
-  })
+  -- Protect sidebar from buffer override using nvim-tree approach
+  M.setup_buffer_protection()
   
   -- Set up buffer-specific keymaps
   local opts = { noremap = true, silent = true, buffer = sidebar_bufnr }
@@ -221,26 +174,26 @@ function M.extract_story_cards(content, stories)
       table.insert(stories, story)
     end
     
-    -- Also check for "* STORY:" pattern or class name pattern (richer JSDoc format)
-    local story_content_match = line:match('%*%s*STORY:%s*(.+)')
+    -- Extract practical JSDoc with technical descriptions
+    local story_content_match = nil
     
-    -- Check for class/component name at start of comment (e.g., "* ClaudeWebAppAdapter")
-    if not story_content_match then
-      story_content_match = line:match('%*%s*([A-Z][a-zA-Z0-9_]*)')
-      if story_content_match then
-        -- Look ahead to see if this looks like a class story (has purpose/description)
-        local has_story_content = false
-        for peek = i + 1, math.min(i + 5, #lines) do
-          local peek_line = lines[peek]
-          if peek_line:match('%*%s*I ') or peek_line:match('%*%s*MY ') or peek_line:match('%*%s*PURPOSE:') then
-            has_story_content = true
-            break
-          elseif peek_line:match('%*/') then
-            break
-          end
-        end
-        if not has_story_content then
-          story_content_match = nil  -- Not a story comment, just a regular class comment
+    -- Look for class/component documentation pattern
+    local potential_class = line:match('^%s*%*%s*([A-Z][a-zA-Z0-9_]*)%s*$')
+    if potential_class and #potential_class >= 4 then
+      -- Check if this is followed by technical description, not mystical fragments
+      for peek = i + 1, math.min(i + 8, #lines) do
+        local peek_line = lines[peek]
+        if peek_line:match('%*/') then break end
+        
+        -- Look for practical technical patterns
+        if peek_line:match('%*%s*PURPOSE:') or
+           peek_line:match('%*%s*INPUTS:') or
+           peek_line:match('%*%s*OUTPUTS:') or
+           peek_line:match('%*%s*ACCESS BOUNDARY:') or
+           peek_line:match('%*%s*RESPONSIBILITIES:') or
+           peek_line:match('%*%s*[A-Z][a-z]+ [a-z]+ [a-z]+') then -- "Coordinates conversation lifecycle"
+          story_content_match = potential_class
+          break
         end
       end
     end
@@ -884,8 +837,11 @@ function M.show_code_structure()
           for _, call_name in ipairs(current_calls) do
             if not unique_calls[call_name] then
               unique_calls[call_name] = true
-              -- Try to resolve to Class.method format
-              local resolved_call = M.resolve_call_to_class_method(call_name, filename)
+              -- Debug current function context
+              debug_log('Resolving call: ' .. call_name .. ' for function: ' .. current_function.name .. 
+                       ' in class: ' .. (current_function.class_name or 'nil'))
+              -- Resolve to Class.method format with current function context
+              local resolved_call = M.resolve_call_to_class_method_enhanced(call_name, current_function, filename)
               table.insert(display_lines, resolved_call)
             end
           end
@@ -928,7 +884,7 @@ function M.show_code_structure()
               for _, story in ipairs(structure.stories) do
                 if story.title:lower():find(class.name:lower()) or 
                    story.line <= (class.line or 0) + 10 then -- Class story should be near class declaration
-                  local wrapped_lines = M.word_wrap(story.content, 35)
+                  local wrapped_lines = M.word_wrap(story.content, 60)
                   for _, wrapped_line in ipairs(wrapped_lines) do
                     table.insert(display_lines, "      " .. wrapped_line)
                   end
@@ -1017,7 +973,7 @@ function M.show_code_structure()
             if not method_story_found and structure.stories and #structure.stories > 0 then
               for _, story in ipairs(structure.stories) do
                 if story.title:lower():find(current_function.name:lower()) then
-                  local wrapped_lines = M.word_wrap(story.content, 30)
+                  local wrapped_lines = M.word_wrap(story.content, 60)
                   for _, wrapped_line in ipairs(wrapped_lines) do
                     table.insert(display_lines, "        " .. wrapped_line)
                   end
@@ -1135,7 +1091,7 @@ function M.move_up()
   end
 end
 
--- Jump to line in main buffer (if line number found) or external file
+-- Enhanced navigation - <enter> should do something useful on every line
 function M.select_item()
   if current_state == 'structure' and sidebar_bufnr and vim.api.nvim_buf_is_valid(sidebar_bufnr) and 
      sidebar_winid and vim.api.nvim_win_is_valid(sidebar_winid) then
@@ -1143,95 +1099,396 @@ function M.select_item()
     local line = vim.api.nvim_buf_get_lines(sidebar_bufnr, current_pos[1] - 1, current_pos[1], false)[1]
     
     debug_log('Enter pressed on line: ' .. (line or 'nil'))
-    print('DEBUG: Enter pressed on line: ' .. (line or 'nil'))
     
-    -- Check for caller format: "📞 SomeClass.method (SomeFile.js:123)"
+    if not line or line == '' then return end
+    
+    -- 1. Check for caller format: "SomeClass.method (SomeFile.js:123)"
     local file_name, line_num = line:match('%(([^:]+):(%d+)%)')
     if file_name and line_num then
-      -- Navigate to external file in main window, not sidebar
-      local file_path = 'src/content/' .. file_name
-      if vim.fn.filereadable(file_path) == 1 then
-        -- Find main window (not the sidebar)
-        local main_win = nil
-        for _, win in ipairs(vim.api.nvim_list_wins()) do
-          if win ~= sidebar_winid and vim.api.nvim_win_is_valid(win) then
-            main_win = win
-            break
-          end
-        end
-        
-        if main_win then
-          -- Switch to main window and open file there
-          vim.api.nvim_set_current_win(main_win)
-          vim.cmd('edit ' .. file_path)
-          vim.api.nvim_win_set_cursor(0, {tonumber(line_num), 0})
-          vim.cmd('normal! zz')
-        else
-          -- No main window found, create a new split
-          vim.cmd('wincmd p')  -- Try to go to previous window
-          vim.cmd('edit ' .. file_path)
-          vim.api.nvim_win_set_cursor(0, {tonumber(line_num), 0})
-          vim.cmd('normal! zz')
-        end
+      M.navigate_to_external_file(file_name, tonumber(line_num))
+      return
+    end
+    
+    -- 2. Check for story card line references: "(L123)" or "[filename:123]"
+    line_num = line:match('%(L(%d+)%)')
+    if not line_num then
+      line_num = line:match('%[.-:(%d+)%]')
+    end
+    if line_num and main_bufnr then
+      M.navigate_to_main_buffer_line(tonumber(line_num))
+      return
+    end
+    
+    -- 3. Check for story cards: "[[card name]]" - navigate to where story card is written
+    local story_card_name = line:match('%[%[(.-)%]%]')
+    if story_card_name then
+      M.navigate_to_story_card_source(story_card_name)
+      return
+    end
+    
+    -- 4. Check for method names (including marked current method with **)
+    local method_name = line:match('^%s*%*?%*?%s*([_%w][_%w]*)')
+    if method_name and main_bufnr then
+      M.navigate_to_method_definition(method_name)
+      return
+    end
+    
+    -- 5. Check for class names: "class ClassName"
+    local class_name = line:match('^%s*class%s+([_%w][_%w]*)')
+    if class_name and main_bufnr then
+      M.navigate_to_class_definition(class_name)
+      return
+    end
+    
+    -- 6. Check for property lines: "this.property: type"
+    local property_name = line:match('^%s*this%.([_%w][_%w]*):')
+    if property_name and main_bufnr then
+      M.navigate_to_property_assignment(property_name)
+      return
+    end
+    
+    -- 7. Check for call/action patterns: "R - Rename method"
+    local action_key = line:match('^%s*([A-Z])%s*%-')
+    if action_key then
+      M.execute_sidebar_action(action_key)
+      return
+    end
+    
+    -- 8. Check for "see also" references with similarity scores
+    local similar_story, similarity = line:match('^%s*%*%s*(.+)%s*%(([%d%.]+)%)$')
+    if similar_story then
+      M.navigate_to_similar_story(similar_story, similarity)
+      return
+    end
+    
+    -- 9. Check for test coverage lines: "✅ TestFile.js:123 - test description"
+    -- Pattern matches the exact format from get_test_coverage display (line 1017)
+    local test_match = line:match('^%s*(.-)%s*:(%d+)%s*%-%s*(.+)$')
+    if test_match then
+      local test_file, test_line, test_desc = line:match('^%s*(.-)%s*:(%d+)%s*%-%s*(.+)$')
+      -- Check if this looks like a test file (contains common test patterns)
+      if test_file and test_line and (
+          test_file:match('%.test%.') or 
+          test_file:match('%.spec%.') or 
+          test_file:match('test') or 
+          line:match('^%s*[✅❌⚠️]') -- Has test status emoji
+        ) then
+        debug_log('Test navigation: ' .. test_file .. ':' .. test_line)
+        M.navigate_to_test_file(test_file, tonumber(test_line))
         return
       end
     end
     
-    -- Extract line number from "(L123)" format (story cards)
-    line_num = line:match('%(L(%d+)%)')
-    if line_num and main_bufnr then
-      -- Find window containing the main buffer
-      for _, win in ipairs(vim.api.nvim_list_wins()) do
-        if vim.api.nvim_win_get_buf(win) == main_bufnr then
-          vim.api.nvim_set_current_win(win)
-          vim.api.nvim_win_set_cursor(win, {tonumber(line_num), 0})
-          vim.cmd('normal! zz')  -- Center the line
-          break
-        end
-      end
+    -- 10. Check for caller display lines: "ClaudeView.method (ClaudeView.js:123)"
+    local caller_class, caller_method, caller_file, caller_line = line:match('^%s*(.-)%.(.-)%s+%((.-)%s*:(%d+)%)')
+    if caller_class and caller_method and caller_file and caller_line then
+      M.navigate_to_external_file(caller_file, tonumber(caller_line))
+      return
     end
     
-    -- Enhanced: Navigate to method definition by name
-    -- Match method names from the class methods list
-    local method_name = line and line:match('^%s*([_%w][_%w]*)')
-    if method_name and main_bufnr then
-      debug_log('Trying to navigate to method: ' .. method_name)
-      
-      -- Search for method definition in main buffer
-      local main_lines = vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false)
-      for i, main_line in ipairs(main_lines) do
-        -- Enhanced patterns to match actual method definitions, not callbacks
-        -- Pattern 1: "async methodName(" - async method definition
-        -- Pattern 2: "  methodName(" - regular method definition (with indentation)
-        -- Pattern 3: "methodName() {" - method with explicit braces
-        -- Exclude patterns like "methodName:" (object property) or "this.methodName(" (method call)
-        -- Escape special regex characters in method name
-        local escaped_method_name = method_name:gsub('([%^%$%(%)%%%.%[%]%*%+%-%?])', '%%%1')
-        
-        local is_method_def = (
-          main_line:match('^%s*async%s+' .. escaped_method_name .. '%s*%(') or  -- async methodName(
-          (main_line:match('^%s+' .. escaped_method_name .. '%s*%(') and not main_line:match(':')) or  -- indented methodName( (not property)
-          main_line:match('^%s*' .. escaped_method_name .. '%s*%(%s*%)%s*{') -- methodName() {
-        ) and not main_line:match('this%.' .. escaped_method_name) -- exclude this.methodName calls
-        
-        if is_method_def then
-          
-          debug_log('Found method definition at line: ' .. i)
-          
-          -- Find window containing the main buffer and navigate
-          for _, win in ipairs(vim.api.nvim_list_wins()) do
-            if vim.api.nvim_win_get_buf(win) == main_bufnr then
-              vim.api.nvim_set_current_win(win)
-              vim.api.nvim_win_set_cursor(win, {i, 0})
-              vim.cmd('normal! zz')  -- Center the line
-              return
-            end
-          end
-        end
+    -- 11. Fallback: If line contains useful text, show it or search for it
+    local useful_text = line:match('^%s*(.-)%s*$') -- trim whitespace
+    if useful_text and useful_text ~= '' and not useful_text:match('^%-+$') and not useful_text:match('^=+$') then
+      -- If it looks like descriptive text, search for it in the current file
+      if #useful_text > 10 and not useful_text:match('^#') then
+        M.search_in_current_file(useful_text)
+      else
+        print('📋 ' .. useful_text)
       end
-      print('Method definition not found: ' .. method_name)
     end
   end
+end
+
+-- Navigate to external file and line
+function M.navigate_to_external_file(file_name, line_num)
+  debug_log('Navigating to external file: ' .. file_name .. ':' .. line_num)
+  
+  -- Try different path patterns
+  local search_paths = {
+    'src/content/' .. file_name,
+    'src/' .. file_name,
+    file_name,
+    './' .. file_name
+  }
+  
+  local file_path = nil
+  for _, path in ipairs(search_paths) do
+    if vim.fn.filereadable(path) == 1 then
+      file_path = path
+      break
+    end
+  end
+  
+  if not file_path then
+    print('File not found: ' .. file_name)
+    return
+  end
+  
+  -- Find main window (not the sidebar)
+  local main_win = M.find_main_window()
+  if main_win then
+    vim.api.nvim_set_current_win(main_win)
+    vim.cmd('edit ' .. file_path)
+    vim.api.nvim_win_set_cursor(0, {line_num, 0})
+    vim.cmd('normal! zz')
+  else
+    -- Create a new split if no main window
+    vim.cmd('wincmd p')
+    vim.cmd('edit ' .. file_path)
+    vim.api.nvim_win_set_cursor(0, {line_num, 0})
+    vim.cmd('normal! zz')
+  end
+end
+
+-- Navigate to line in main buffer
+function M.navigate_to_main_buffer_line(line_num)
+  debug_log('Navigating to main buffer line: ' .. line_num)
+  
+  local main_win = M.find_main_window()
+  if main_win then
+    vim.api.nvim_set_current_win(main_win)
+    vim.api.nvim_win_set_cursor(main_win, {line_num, 0})
+    vim.cmd('normal! zz')
+  end
+end
+
+-- Navigate to where a story card is written in the source
+function M.navigate_to_story_card_source(story_card_name)
+  debug_log('Looking for story card source: ' .. story_card_name)
+  
+  if not main_bufnr or not vim.api.nvim_buf_is_valid(main_bufnr) then
+    return
+  end
+  
+  local main_lines = vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false)
+  local clean_card_name = story_card_name:gsub('%s*card%s*$', '') -- Remove "card" suffix
+  
+  -- Look for story card patterns in comments
+  for i, main_line in ipairs(main_lines) do
+    -- Pattern 1: "* STORY CARD: CardName"
+    if main_line:match('STORY CARD:%s*' .. clean_card_name) then
+      M.navigate_to_main_buffer_line(i)
+      return
+    end
+    
+    -- Pattern 2: JSDoc with class/component name
+    if main_line:match('%*%s*' .. clean_card_name .. '%s*$') and 
+       (main_line:match('PURPOSE:') or main_line:match('INPUTS:') or main_line:match('OUTPUTS:')) then
+      M.navigate_to_main_buffer_line(i)
+      return
+    end
+    
+    -- Pattern 3: Class definition line
+    if main_line:match('class%s+' .. clean_card_name) or main_line:match('export%s+class%s+' .. clean_card_name) then
+      M.navigate_to_main_buffer_line(i)
+      return
+    end
+  end
+  
+  print('Story card source not found: ' .. story_card_name)
+end
+
+-- Navigate to method definition with enhanced pattern matching
+function M.navigate_to_method_definition(method_name)
+  debug_log('Navigating to method: ' .. method_name)
+  
+  if not main_bufnr or not vim.api.nvim_buf_is_valid(main_bufnr) then
+    return
+  end
+  
+  -- Clean up method name (remove async markers, etc.)
+  local clean_method = method_name:gsub('%s*%[async%]', ''):gsub('^%*+%s*', '')
+  
+  local main_lines = vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false)
+  local escaped_method_name = clean_method:gsub('([%^%$%(%)%%%.%[%]%*%+%-%?])', '%%%1')
+  
+  for i, main_line in ipairs(main_lines) do
+    local is_method_def = (
+      main_line:match('^%s*async%s+' .. escaped_method_name .. '%s*%(') or  -- async methodName(
+      (main_line:match('^%s+' .. escaped_method_name .. '%s*%(') and not main_line:match(':')) or  -- indented methodName(
+      main_line:match('^%s*' .. escaped_method_name .. '%s*%(%s*%)%s*{') or -- methodName() {
+      main_line:match('^%s*' .. escaped_method_name .. '%s*%(.-%)%s*{') -- methodName(args) {
+    ) and not main_line:match('this%.' .. escaped_method_name) -- exclude this.methodName calls
+    
+    if is_method_def then
+      debug_log('Found method definition at line: ' .. i)
+      M.navigate_to_main_buffer_line(i)
+      return
+    end
+  end
+  
+  print('Method definition not found: ' .. clean_method)
+end
+
+-- Navigate to class definition
+function M.navigate_to_class_definition(class_name)
+  debug_log('Navigating to class: ' .. class_name)
+  
+  if not main_bufnr or not vim.api.nvim_buf_is_valid(main_bufnr) then
+    return
+  end
+  
+  local main_lines = vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false)
+  
+  for i, main_line in ipairs(main_lines) do
+    if main_line:match('^%s*class%s+' .. class_name) or 
+       main_line:match('^%s*export%s+class%s+' .. class_name) then
+      M.navigate_to_main_buffer_line(i)
+      return
+    end
+  end
+  
+  print('Class definition not found: ' .. class_name)
+end
+
+-- Navigate to property assignment in constructor
+function M.navigate_to_property_assignment(property_name)
+  debug_log('Navigating to property: ' .. property_name)
+  
+  if not main_bufnr or not vim.api.nvim_buf_is_valid(main_bufnr) then
+    return
+  end
+  
+  local main_lines = vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false)
+  
+  for i, main_line in ipairs(main_lines) do
+    if main_line:match('this%.' .. property_name .. '%s*=') then
+      M.navigate_to_main_buffer_line(i)
+      return
+    end
+  end
+  
+  print('Property assignment not found: ' .. property_name)
+end
+
+-- Execute sidebar action (R, D, J, F, T, E keys)
+function M.execute_sidebar_action(action_key)
+  debug_log('Executing sidebar action: ' .. action_key)
+  
+  if action_key == 'R' then
+    M.agent_rename_method()
+  elseif action_key == 'D' then
+    M.agent_add_debug()
+  elseif action_key == 'J' then
+    M.agent_generate_jsdoc()
+  elseif action_key == 'F' then
+    M.agent_find_usages()
+  elseif action_key == 'T' then
+    M.agent_generate_test()
+  elseif action_key == 'E' then
+    M.agent_extract_class()
+  else
+    print('Unknown action: ' .. action_key)
+  end
+end
+
+-- Search for text in current file with proper escaping
+function M.search_in_current_file(search_text)
+  debug_log('Searching in current file: ' .. search_text)
+  
+  local main_win = M.find_main_window()
+  if main_win then
+    vim.api.nvim_set_current_win(main_win)
+    
+    -- Clean and escape search text for vim search
+    local clean_text = search_text:gsub('%s+', ' '):gsub('^%s+', ''):gsub('%s+$', '')
+    
+    -- Escape special regex characters for vim search
+    local escaped_text = clean_text:gsub('([%^%$%(%)%%%.%[%]%*%+%-%?%\\%/])', '\\%1')
+    
+    -- Try search, but handle errors gracefully
+    local ok, _ = pcall(function()
+      vim.cmd('/' .. escaped_text)
+    end)
+    
+    if ok then
+      print('🔍 Searching: ' .. clean_text:sub(1, 40) .. (clean_text:len() > 40 and '...' or ''))
+    else
+      -- Fallback to simpler word search if complex search fails
+      local first_word = clean_text:match('%w+')
+      if first_word then
+        vim.cmd('/' .. first_word)
+        print('🔍 Searching (simplified): ' .. first_word)
+      else
+        print('⚠️ Cannot search for: ' .. clean_text:sub(1, 20) .. '...')
+      end
+    end
+  end
+end
+
+-- Navigate to similar story by searching for it
+function M.navigate_to_similar_story(story_name, similarity)
+  debug_log('Navigating to similar story: ' .. story_name .. ' (similarity: ' .. similarity .. ')')
+  
+  -- Try to find the story in the current codebase by searching for the story name
+  local search_term = story_name:gsub('%..*$', '') -- Remove file extension if present
+  
+  -- Search in current file first
+  M.search_in_current_file(search_term)
+end
+
+-- Navigate to test file and line
+function M.navigate_to_test_file(test_file, test_line)
+  debug_log('Navigating to test: ' .. test_file .. ':' .. test_line)
+  
+  -- Clean up test file name (remove emoji and extra whitespace)
+  local clean_test_file = test_file:gsub('^[✅❌⚠️%s]*', ''):gsub('%s+$', '')
+  
+  -- Try common test file paths relative to current directory  
+  local current_dir = vim.fn.getcwd()
+  local test_paths = {
+    clean_test_file, -- Direct path
+    'test/' .. clean_test_file,
+    'tests/' .. clean_test_file,
+    'tests/unit/' .. clean_test_file,
+    'tests/integration/' .. clean_test_file,
+    '__tests__/' .. clean_test_file,
+    'spec/' .. clean_test_file,
+    'src/test/' .. clean_test_file,
+    'src/tests/' .. clean_test_file,
+    '../test/' .. clean_test_file,
+    '../tests/' .. clean_test_file,
+  }
+  
+  -- Also try to find files with glob pattern
+  local glob_pattern = '**/' .. clean_test_file
+  local glob_results = vim.fn.glob(glob_pattern, false, true)
+  for _, result in ipairs(glob_results) do
+    table.insert(test_paths, result)
+  end
+  
+  local found_path = nil
+  for _, path in ipairs(test_paths) do
+    debug_log('Checking test path: ' .. path)
+    if vim.fn.filereadable(path) == 1 then
+      found_path = path
+      debug_log('Found test file at: ' .. path)
+      break
+    end
+  end
+  
+  if found_path then
+    local main_win = M.find_main_window()
+    if main_win then
+      vim.api.nvim_set_current_win(main_win)
+      vim.cmd('edit ' .. found_path)
+      vim.api.nvim_win_set_cursor(0, {test_line, 0})
+      vim.cmd('normal! zz')
+    end
+  else
+    print('❌ Test file not found: ' .. clean_test_file)
+    debug_log('Searched paths: ' .. table.concat(test_paths, ', '))
+  end
+end
+
+-- Helper: Find main window (not sidebar)
+function M.find_main_window()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if win ~= sidebar_winid and vim.api.nvim_win_is_valid(win) then
+      return win
+    end
+  end
+  return nil
 end
 
 -- Expand story context (right arrow)
@@ -1532,27 +1789,145 @@ function M.get_test_coverage(function_name, filename)
       if vim.fn.filereadable(test_file) == 1 then
         local test_content = table.concat(vim.fn.readfile(test_file), '\n')
         
-        -- Look for test cases mentioning this function
-        local lines = vim.split(test_content, '\n')
-        for i, line in ipairs(lines) do
-          if line:find(function_name, 1, true) and 
-             (line:find('test(', 1, true) or line:find('it(', 1, true) or line:find('describe(', 1, true)) then
-            
-            local test_name = line:match('["\']([^"\']+)["\']') or 'unnamed test'
-            table.insert(test_info.covering_tests, {
-              file = vim.fn.fnamemodify(test_file, ':t'),
-              line = i,
-              name = test_name,
-              passing = true -- TODO: Get actual test results
-            })
-          end
-        end
+        -- Look for test cases that actually invoke this function
+        M.find_tests_invoking_function(test_content, test_file, function_name, test_info.covering_tests)
       end
     end
   end
   
   debug_log('Found ' .. #test_info.covering_tests .. ' covering tests')
   return test_info
+end
+
+-- Find tests that actually invoke a specific function (not just mention it)
+function M.find_tests_invoking_function(test_content, test_file, function_name, covering_tests)
+  debug_log('Analyzing test file for actual invocations: ' .. test_file)
+  
+  local lines = vim.split(test_content, '\n')
+  local current_test = nil
+  local in_test_body = false
+  local brace_count = 0
+  
+  for i, line in ipairs(lines) do
+    -- Detect test case start: test(...) or it(...)
+    local test_name = line:match('test%s*%(%s*["\']([^"\']+)["\']') or
+                      line:match('it%s*%(%s*["\']([^"\']+)["\']')
+    
+    if test_name then
+      current_test = {
+        name = test_name,
+        start_line = i,
+        file = vim.fn.fnamemodify(test_file, ':t'),
+        invokes_function = false
+      }
+      in_test_body = false
+      brace_count = 0
+    end
+    
+    -- Track braces to know when we're inside test body
+    if current_test then
+      for char in line:gmatch('.') do
+        if char == '{' then
+          brace_count = brace_count + 1
+          if brace_count == 1 and not in_test_body then
+            in_test_body = true
+          end
+        elseif char == '}' then
+          brace_count = brace_count - 1
+          if brace_count == 0 and in_test_body then
+            -- Test ended - check if we found function invocation
+            if current_test.invokes_function then
+              table.insert(covering_tests, {
+                file = current_test.file,
+                line = current_test.start_line,
+                name = current_test.name,
+                passing = true -- TODO: Get actual test results from test runner
+              })
+            end
+            current_test = nil
+            in_test_body = false
+          end
+        end
+      end
+      
+      -- Look for actual function invocations in test body
+      if in_test_body and current_test then
+        -- Pattern 1: direct method call: functionName()
+        if line:match('%W' .. function_name .. '%s*%(') or line:match('^%s*' .. function_name .. '%s*%(') then
+          current_test.invokes_function = true
+          debug_log('Found direct invocation in test: ' .. current_test.name)
+        end
+        
+        -- Pattern 2: object method call: obj.functionName() or this.functionName()
+        if line:match('%w+%.' .. function_name .. '%s*%(') or line:match('this%.' .. function_name .. '%s*%(') then
+          current_test.invokes_function = true
+          debug_log('Found method invocation in test: ' .. current_test.name)
+        end
+        
+        -- Pattern 3: spy/mock verification: expect(...).toHaveBeenCalled() patterns
+        -- This covers cases where the function is called indirectly but verified
+        if line:match('expect.*' .. function_name) and line:match('toHaveBeenCalled') then
+          current_test.invokes_function = true
+          debug_log('Found spy verification in test: ' .. current_test.name)
+        end
+        
+        -- Pattern 4: async/await calls: await functionName()
+        if line:match('await%s+' .. function_name .. '%s*%(') then
+          current_test.invokes_function = true
+          debug_log('Found async invocation in test: ' .. current_test.name)
+        end
+      end
+    end
+  end
+  
+  debug_log('Found ' .. #covering_tests .. ' tests actually invoking ' .. function_name)
+end
+
+-- Test navigation pattern matching
+function M.test_navigation_patterns()
+  debug_log('=== TESTING NAVIGATION PATTERNS ===')
+  print('Testing Story Explorer navigation patterns...')
+  
+  -- Test cases for various line formats
+  local test_lines = {
+    '✅ FamilyTitle-serialization.test.js:6 - test description',
+    '❌ Mail.test.js:123 - another test',
+    '⚠️  No tests found covering this method',
+    '* Similar Story Name (0.85)',
+    'ClaudeView.onViewMail (ClaudeView.js:45)',
+    '[[ClaudeView card]]',
+    'this.onViewMail: method'
+  }
+  
+  for i, test_line in ipairs(test_lines) do
+    print('Testing line ' .. i .. ': ' .. test_line)
+    
+    -- Test the same logic as select_item but without actions
+    local similar_story, similarity = test_line:match('^%s*%*%s*(.+)%s*%(([%d%.]+)%)$')
+    if similar_story then
+      print('  → Similar story: ' .. similar_story)
+    end
+    
+    local test_match = test_line:match('^%s*(.-)%s*:(%d+)%s*%-%s*(.+)$')
+    if test_match then
+      local test_file, test_line_num, test_desc = test_line:match('^%s*(.-)%s*:(%d+)%s*%-%s*(.+)$')
+      if test_file and test_line_num and (
+          test_file:match('%.test%.') or 
+          test_file:match('%.spec%.') or 
+          test_file:match('test') or 
+          test_line:match('^%s*[✅❌⚠️]')
+        ) then
+        print('  → Test navigation: ' .. test_file .. ':' .. test_line_num)
+      end
+    end
+    
+    local story_card_name = test_line:match('%[%[(.-)%]%]')
+    if story_card_name then
+      print('  → Story card: ' .. story_card_name)
+    end
+  end
+  
+  print('Navigation pattern test complete!')
 end
 
 -- Test function for unified layout validation
@@ -1615,7 +1990,142 @@ function M.get_relevant_story_cards(function_name, current_file)
   return relevant_stories
 end
 
--- Resolve call name to Class.method format using enhanced callgraph
+-- Enhanced call resolution with current function context
+function M.resolve_call_to_class_method_enhanced(call_name, current_function, current_file)
+  debug_log('Enhanced resolving call: ' .. call_name .. ' with context')
+  
+  -- Handle this.method calls - use current class context
+  if call_name:match('^this%.') and not call_name:match('^this%._') then
+    local method_name = call_name:gsub('^this%.', '')
+    if current_function.class_name then
+      return current_function.class_name .. '.' .. method_name
+    else
+      -- Fallback to file-based class name
+      local file_class = vim.fn.fnamemodify(current_file, ':t:r')
+      return file_class .. '.' .. method_name
+    end
+  end
+  
+  -- Handle this._privateProperty.method calls - these need special resolution
+  if call_name:match('^this%._') then
+    local property_and_method = call_name:gsub('^this%.', '')
+    
+    -- Pattern: this._view.onNewMail -> ClaudeView.onNewMail
+    -- Pattern: this._familyClient.sendMail -> FamilyClient.sendMail
+    local property, method = property_and_method:match('^_([^%.]+)%.(.+)$')
+    if property and method then
+      -- Try to resolve property type from constructor assignments or imports
+      local resolved_class = M.resolve_property_to_class(property, current_file)
+      if resolved_class then
+        return resolved_class .. '.' .. method
+      else
+        -- Fallback: capitalize property name as class name
+        local guessed_class = property:gsub('^.', string.upper):gsub('([a-z])([A-Z])', '%1%2')
+        return guessed_class .. '.' .. method
+      end
+    else
+      -- Simple private method call
+      if current_function.class_name then
+        return current_function.class_name .. '.' .. property_and_method
+      else
+        local file_class = vim.fn.fnamemodify(current_file, ':t:r')
+        return file_class .. '.' .. property_and_method
+      end
+    end
+  end
+  
+  -- Handle direct method calls - look them up in enhanced callgraph
+  local enhanced_callgraph = M.get_enhanced_callgraph()
+  if enhanced_callgraph then
+    for _, call_entry in ipairs(enhanced_callgraph) do
+      if call_entry.callName == call_name then
+        -- Found a match - extract class information
+        if call_entry.targetClass and call_entry.targetClass ~= '' then
+          return call_entry.targetClass .. '.' .. call_name
+        elseif call_entry.targetFile then
+          -- Use target file name as class if no explicit class
+          local target_class = call_entry.targetFile:gsub('%.js$', '')
+          return target_class .. '.' .. call_name
+        end
+      end
+    end
+  end
+  
+  -- Fallback to original resolution method
+  return M.resolve_call_to_class_method(call_name, current_file)
+end
+
+-- Helper: Resolve property name to class name by looking at constructor or imports
+function M.resolve_property_to_class(property_name, current_file)
+  if not main_bufnr or not vim.api.nvim_buf_is_valid(main_bufnr) then
+    return nil
+  end
+  
+  local main_lines = vim.api.nvim_buf_get_lines(main_bufnr, 0, -1, false)
+  
+  -- Look for constructor assignment: this._view = new ClaudeView(...)
+  for _, line in ipairs(main_lines) do
+    local class_name = line:match('this%._' .. property_name .. '%s*=%s*new%s+([%w_]+)')
+    if class_name then
+      debug_log('Resolved property ' .. property_name .. ' to class ' .. class_name .. ' via constructor')
+      return class_name
+    end
+  end
+  
+  -- Look for import statements: import { ClaudeView } from './ClaudeView.js';
+  local property_variants = {
+    property_name,
+    property_name:gsub('^.', string.upper), -- view -> View  
+    property_name:gsub('([a-z])([A-Z])', '%1%2') -- autoModeManager -> AutoModeManager
+  }
+  
+  for _, line in ipairs(main_lines) do
+    if line:match('^import') then
+      for _, variant in ipairs(property_variants) do
+        -- Check if class name appears in import
+        local class_from_import = line:match('import%s*{[^}]*(%w*' .. variant .. '%w*)[^}]*}')
+        if class_from_import then
+          debug_log('Resolved property ' .. property_name .. ' to class ' .. class_from_import .. ' via import')
+          return class_from_import
+        end
+      end
+    end
+  end
+  
+  -- Fallback: heuristic transformation
+  -- _view -> ClaudeView, _familyClient -> FamilyClient, _autoModeManager -> AutoModeManager
+  local heuristic_class = property_name:gsub('^.', string.upper):gsub('([a-z])([A-Z])', '%1%2')
+  if heuristic_class ~= property_name then
+    debug_log('Resolved property ' .. property_name .. ' to class ' .. heuristic_class .. ' via heuristic')
+    return heuristic_class
+  end
+  
+  return nil
+end
+
+-- Helper to get enhanced callgraph data
+function M.get_enhanced_callgraph()
+  local search_dirs = {
+    vim.fn.getcwd(),
+    vim.fn.fnamemodify(vim.fn.getcwd(), ':h'),
+    vim.fn.fnamemodify(vim.fn.getcwd(), ':h:h')
+  }
+  
+  for _, dir in ipairs(search_dirs) do
+    local callgraph_file = dir .. '/enhanced-callgraph-complete.json'
+    if vim.fn.filereadable(callgraph_file) == 1 then
+      local content = vim.fn.readfile(callgraph_file)
+      local json_str = table.concat(content, '\n')
+      local ok, callgraph_data = pcall(vim.fn.json_decode, json_str)
+      if ok then
+        return callgraph_data
+      end
+    end
+  end
+  return nil
+end
+
+-- Original resolve call name to Class.method format using enhanced callgraph
 function M.resolve_call_to_class_method(call_name, current_file)
   debug_log('Resolving call: ' .. call_name .. ' to Class.method format')
   
@@ -1974,6 +2484,10 @@ function M.setup()
   vim.keymap.set('n', '<leader>sc', '<cmd>lua require("custom.story-explorer").test_callgraph()<CR>',
     { noremap = true, silent = true, desc = 'Test Callgraph Integration' })
   
+  -- Test command for navigation patterns
+  vim.keymap.set('n', '<leader>sn', '<cmd>lua require("custom.story-explorer").test_navigation_patterns()<CR>',
+    { noremap = true, silent = true, desc = 'Test Navigation Patterns' })
+  
   -- Set up autocommands for live updates
   vim.api.nvim_create_augroup('StoryExplorerAuto', { clear = true })
   
@@ -2009,6 +2523,85 @@ function M.setup()
       end))
     end,
   })
+end
+
+-- Buffer protection using simpler BufEnter approach with flash correction
+function M.setup_buffer_protection()
+  vim.api.nvim_create_autocmd('BufEnter', {
+    group = vim.api.nvim_create_augroup('StoryExplorerProtection', { clear = true }),
+    callback = function()
+      debug_log('BufEnter triggered - checking for buffer override')
+      M.prevent_buffer_override()
+    end
+  })
+end
+
+-- Prevent buffer override - check if wrong buffer loaded in sidebar window  
+function M.prevent_buffer_override()
+  -- Early exit if sidebar not valid
+  if not sidebar_winid or not vim.api.nvim_win_is_valid(sidebar_winid) or
+     not sidebar_bufnr or not vim.api.nvim_buf_is_valid(sidebar_bufnr) then
+    debug_log('Sidebar not valid for protection check')
+    return
+  end
+  
+  local current_win = vim.api.nvim_get_current_win()
+  local current_buf = vim.api.nvim_win_get_buf(current_win)
+  local buf_name = vim.api.nvim_buf_get_name(current_buf)
+  
+  debug_log('Protection check: current_win=' .. current_win .. ' sidebar_winid=' .. (sidebar_winid or 'nil') .. 
+           ' current_buf=' .. current_buf .. ' sidebar_bufnr=' .. (sidebar_bufnr or 'nil') .. 
+           ' buf_name=' .. buf_name)
+  
+  -- If we're in the sidebar window but with the wrong buffer
+  if current_win == sidebar_winid and current_buf ~= sidebar_bufnr then
+    -- Skip empty buffers or already correct buffers
+    if buf_name == '' or buf_name:match('story%-explorer') then
+      debug_log('Skipping empty or story-explorer buffer')
+      return
+    end
+    
+    debug_log('Buffer override detected in sidebar: ' .. buf_name)
+    
+    -- Schedule the fix to avoid autocmd recursion
+    vim.schedule(function()
+      -- Remove window fix constraints
+      pcall(function() vim.cmd('setlocal nowinfixwidth') end)
+      pcall(function() vim.cmd('setlocal nowinfixheight') end)
+      
+      -- Find a main window for the intruding buffer  
+      local main_win = nil
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if win ~= sidebar_winid and vim.api.nvim_win_is_valid(win) then
+          main_win = win
+          break
+        end
+      end
+      
+      if main_win then
+        -- Move to main window and show buffer there
+        vim.api.nvim_set_current_win(main_win)
+        vim.api.nvim_win_set_buf(main_win, current_buf)
+        debug_log('Moved buffer to existing main window: ' .. main_win)
+      else
+        -- Create new window for the buffer
+        vim.cmd('split')
+        vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), current_buf)
+        debug_log('Created new window for buffer')
+      end
+      
+      -- Restore sidebar buffer to sidebar window
+      if sidebar_winid and vim.api.nvim_win_is_valid(sidebar_winid) and
+         sidebar_bufnr and vim.api.nvim_buf_is_valid(sidebar_bufnr) then
+        vim.api.nvim_win_set_buf(sidebar_winid, sidebar_bufnr)
+        debug_log('Restored sidebar buffer to sidebar window')
+      end
+      
+      debug_log('Buffer override corrected - moved ' .. buf_name .. ' to proper window')
+    end)
+  else
+    debug_log('No buffer override detected')
+  end
 end
 
 -- Right arrow: expand/reveal story context  
