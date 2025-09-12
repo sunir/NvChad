@@ -1852,29 +1852,41 @@ function M.find_tests_invoking_function(test_content, test_file, function_name, 
       
       -- Look for actual function invocations in test body
       if in_test_body and current_test then
-        -- Pattern 1: direct method call: functionName()
-        if line:match('%W' .. function_name .. '%s*%(') or line:match('^%s*' .. function_name .. '%s*%(') then
-          current_test.invokes_function = true
-          debug_log('Found direct invocation in test: ' .. current_test.name)
-        end
-        
-        -- Pattern 2: object method call: obj.functionName() or this.functionName()
-        if line:match('%w+%.' .. function_name .. '%s*%(') or line:match('this%.' .. function_name .. '%s*%(') then
-          current_test.invokes_function = true
-          debug_log('Found method invocation in test: ' .. current_test.name)
-        end
-        
-        -- Pattern 3: spy/mock verification: expect(...).toHaveBeenCalled() patterns
-        -- This covers cases where the function is called indirectly but verified
-        if line:match('expect.*' .. function_name) and line:match('toHaveBeenCalled') then
-          current_test.invokes_function = true
-          debug_log('Found spy verification in test: ' .. current_test.name)
-        end
-        
-        -- Pattern 4: async/await calls: await functionName()
-        if line:match('await%s+' .. function_name .. '%s*%(') then
-          current_test.invokes_function = true
-          debug_log('Found async invocation in test: ' .. current_test.name)
+        -- Handle constructor special case
+        if function_name == 'constructor' then
+          -- Extract class name from current_test.file or context
+          local class_name = current_test.file:gsub('%.test%.js$', ''):gsub('%-.*$', '') -- FamilyTitle-serialization.test.js -> FamilyTitle
+          
+          -- Look for constructor invocations: new ClassName()
+          if line:match('new%s+' .. class_name .. '%s*%(') then
+            current_test.invokes_function = true
+            debug_log('Found constructor invocation in test: ' .. current_test.name .. ' (new ' .. class_name .. '())')
+          end
+        else
+          -- Pattern 1: direct method call: functionName()
+          if line:match('%W' .. function_name .. '%s*%(') or line:match('^%s*' .. function_name .. '%s*%(') then
+            current_test.invokes_function = true
+            debug_log('Found direct invocation in test: ' .. current_test.name)
+          end
+          
+          -- Pattern 2: object method call: obj.functionName() or this.functionName()
+          if line:match('%w+%.' .. function_name .. '%s*%(') or line:match('this%.' .. function_name .. '%s*%(') then
+            current_test.invokes_function = true
+            debug_log('Found method invocation in test: ' .. current_test.name)
+          end
+          
+          -- Pattern 3: spy/mock verification: expect(...).toHaveBeenCalled() patterns
+          -- This covers cases where the function is called indirectly but verified
+          if line:match('expect.*' .. function_name) and line:match('toHaveBeenCalled') then
+            current_test.invokes_function = true
+            debug_log('Found spy verification in test: ' .. current_test.name)
+          end
+          
+          -- Pattern 4: async/await calls: await functionName()
+          if line:match('await%s+' .. function_name .. '%s*%(') then
+            current_test.invokes_function = true
+            debug_log('Found async invocation in test: ' .. current_test.name)
+          end
         end
       end
     end
