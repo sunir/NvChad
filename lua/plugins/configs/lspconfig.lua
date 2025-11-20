@@ -40,11 +40,13 @@ M.capabilities.textDocument.completion.completionItem = {
   },
 }
 
-require("lspconfig").lua_ls.setup {
+-- Use new vim.lsp.config API (nvim 0.11+)
+vim.lsp.config('lua_ls', {
   on_init = M.on_init,
   on_attach = M.on_attach,
   capabilities = M.capabilities,
-
+  cmd = { 'lua-language-server' },
+  root_markers = { '.luarc.json', '.luarc.jsonc', '.luacheckrc', '.stylua.toml', 'stylua.toml', 'selene.toml', 'selene.yml', '.git' },
   settings = {
     Lua = {
       diagnostics = {
@@ -62,6 +64,14 @@ require("lspconfig").lua_ls.setup {
       },
     },
   },
-}
+})
+
+-- Enable lua_ls for Lua files
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'lua',
+  callback = function(args)
+    vim.lsp.enable('lua_ls')
+  end,
+})
 
 return M
