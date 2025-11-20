@@ -139,22 +139,37 @@ end
 function M.extract_story_cards(content, stories)
   debug_log('Extracting story cards')
   
-  -- Match both "* STORY CARD: title" and "* STORY: content" patterns in comments
+  -- Match "* STORY CARD:", "* STORY:", and "* @story" patterns in comments
   local lines = vim.split(content, '\n')
   
   for i, line in ipairs(lines) do
     -- First, check for "* STORY CARD:" pattern
     local story_title = line:match('%*%s*STORY CARD:%s*(.+)')
-    if story_title then
-      debug_log('Found story card: ' .. story_title)
+    
+    -- Also check for JSDoc @story directive
+    local jsdoc_story = line:match('%*%s*@story%s+(.+)')
+    
+    if story_title or jsdoc_story then
+      local title = story_title or (jsdoc_story and jsdoc_story:sub(1, 50) .. "..." or "JSDoc Story")
+      debug_log('Found story: ' .. (story_title or "JSDoc @story"))
       
-      -- Collect all content from this story card until end of comment or next story card
+      -- Collect all content from this story card until end of comment or next story card  
       local story_content = {}
+      
+      -- If this is a @story directive, include the first line
+      if jsdoc_story then
+        table.insert(story_content, jsdoc_story)
+      end
+      
       for j = i + 1, math.min(i + 20, #lines) do
         local content_line = lines[j]
         
-        -- Stop if we hit end of comment or another story card
-        if content_line:match('%*/') or content_line:match('%*%s*STORY CARD:') then
+        -- Stop if we hit end of comment, another story card, or another JSDoc tag
+        if content_line:match('%*/') or 
+           content_line:match('%*%s*STORY CARD:') or
+           content_line:match('%*%s*@story') or
+           content_line:match('%*%s*@class') or
+           content_line:match('%*%s*@method') then
           break
         end
         
@@ -166,7 +181,7 @@ function M.extract_story_cards(content, stories)
       end
       
       local story = {
-        title = story_title:gsub('^%s+', ''):gsub('%s+$', ''),
+        title = title:gsub('^%s+', ''):gsub('%s+$', ''),
         content = table.concat(story_content, '\n'),  -- Preserve line breaks for readability
         line = i
       }

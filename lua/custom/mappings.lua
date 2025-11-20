@@ -78,10 +78,6 @@ M.general = {
     -- Delete without yanking
     ["<leader>d"] = { [["_d]], "Delete without yanking" },
 
-    -- Search and replace word under cursor
-    ["<leader>s"] = { [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]], "Search & replace word under cursor" },
-
-
     -- Shift arrows to select
     ["<S-Down>"] = { "vj", "Select down" },
     ["<S-Up>"] = { "vk", "Select up" },

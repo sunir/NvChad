@@ -110,9 +110,6 @@ vim.schedule(function()
   vim.keymap.set("x", "<leader>p", [["_dP]])
   vim.keymap.set({"n", "v"}, "<leader>d", [["_d]])
 
-  -- Search and replace word under cursor
-  vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
-  
   -- Set tab width to 2 spaces
   vim.opt.tabstop = 2        -- Number of spaces that a <Tab> in the file counts for
   vim.opt.shiftwidth = 2     -- Size of an indent
@@ -126,6 +123,15 @@ vim.schedule(function()
   vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
   vim.opt.foldenable = false  -- Start with folds open
   vim.opt.foldlevel = 99      -- Don't fold by default
+
+  -- Make search/replace use very magic mode by default (regex just works)
+  vim.cmd([[cnoreabbrev <expr> s getcmdtype() == ":" && getcmdline() == 's' ? 's/\v' : 's']])
+  vim.cmd([[cnoreabbrev <expr> %s getcmdtype() == ":" && getcmdline() == '%s' ? '%s/\v' : '%s']])
+  vim.cmd([[cnoreabbrev <expr> '<,'>s getcmdtype() == ":" && getcmdline() == "'<,'>s" ? "'<,'>s/\v" : "'<,'>s"]])
+
+  -- Make search (/ and ?) use very magic mode by default
+  vim.cmd([[nnoremap / /\v]])
+  vim.cmd([[nnoremap ? ?\v]])
 end)
 
 require('nvim-tree').setup({ actions = { open_file = { window_picker = { enable = false } } } })
