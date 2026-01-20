@@ -123,15 +123,6 @@ vim.schedule(function()
   vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
   vim.opt.foldenable = false  -- Start with folds open
   vim.opt.foldlevel = 99      -- Don't fold by default
-
-  -- Make search/replace use very magic mode by default (regex just works)
-  vim.cmd([[cnoreabbrev <expr> s getcmdtype() == ":" && getcmdline() == 's' ? 's/\v' : 's']])
-  vim.cmd([[cnoreabbrev <expr> %s getcmdtype() == ":" && getcmdline() == '%s' ? '%s/\v' : '%s']])
-  vim.cmd([[cnoreabbrev <expr> '<,'>s getcmdtype() == ":" && getcmdline() == "'<,'>s" ? "'<,'>s/\v" : "'<,'>s"]])
-
-  -- Make search (/ and ?) use very magic mode by default
-  vim.cmd([[nnoremap / /\v]])
-  vim.cmd([[nnoremap ? ?\v]])
 end)
 
 require('nvim-tree').setup({ actions = { open_file = { window_picker = { enable = false } } } })
