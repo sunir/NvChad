@@ -1074,15 +1074,61 @@ function M.show_code_structure()
       if ts_structure and #ts_structure.children > 0 then
         table.insert(display_lines, "# " .. basename .. " (Python)")
         table.insert(display_lines, "")
-        table.insert(display_lines, "## Structure")
+
+        -- Group by class vs top-level functions
+        local classes = {}
+        local functions = {}
+        local current_class = nil
 
         for _, child in ipairs(ts_structure.children) do
-          local icon = child.type == 'class' and '󰠱' or '󰊕'
-          local indent = child.type == 'class' and '' or '  '
-          table.insert(display_lines, indent .. icon .. ' ' .. child.name .. '  [L' .. child.line .. ']')
+          if child.type == 'class' then
+            current_class = child
+            child.methods = {}
+            table.insert(classes, child)
+          elseif child.type == 'function' then
+            -- Check if this is a method (indented) or top-level
+            if current_class and child.col > 1 then
+              table.insert(current_class.methods, child)
+            else
+              current_class = nil  -- Reset on top-level function
+              table.insert(functions, child)
+            end
+          end
         end
 
-        table.insert(display_lines, "")
+        -- Display classes with methods
+        for _, cls in ipairs(classes) do
+          table.insert(display_lines, "## 󰠱 class " .. cls.name .. "  [L" .. cls.line .. "]")
+          if cls.docstring then
+            table.insert(display_lines, "   " .. cls.docstring)
+          end
+          if cls.methods and #cls.methods > 0 then
+            for _, method in ipairs(cls.methods) do
+              local decorator_str = method.decorator and ("@" .. method.decorator .. " ") or ""
+              local params_str = method.params or "()"
+              table.insert(display_lines, "   󰊕 " .. decorator_str .. method.name .. params_str .. "  [L" .. method.line .. "]")
+              if method.docstring then
+                table.insert(display_lines, "      " .. method.docstring)
+              end
+            end
+          end
+          table.insert(display_lines, "")
+        end
+
+        -- Display top-level functions
+        if #functions > 0 then
+          table.insert(display_lines, "## Functions")
+          for _, func in ipairs(functions) do
+            local decorator_str = func.decorator and ("@" .. func.decorator .. " ") or ""
+            local params_str = func.params or "()"
+            table.insert(display_lines, "󰊕 " .. decorator_str .. func.name .. params_str .. "  [L" .. func.line .. "]")
+            if func.docstring then
+              table.insert(display_lines, "   " .. func.docstring)
+            end
+          end
+          table.insert(display_lines, "")
+        end
+
         table.insert(display_lines, "## Actions")
         table.insert(display_lines, "[L] Show LSP callers")
         table.insert(display_lines, "[S] Refresh TreeSitter structure")
@@ -2465,8 +2511,25 @@ function M.get_treesitter_structure()
   -- Language-specific queries
   local queries = {
     python = [[
-      (class_definition name: (identifier) @class.name) @class
-      (function_definition name: (identifier) @function.name) @function
+      (class_definition
+        name: (identifier) @class.name
+        body: (block
+          (expression_statement (string) @class.docstring)?
+        )?
+      ) @class
+
+      (function_definition
+        name: (identifier) @function.name
+        parameters: (parameters) @function.params
+        body: (block
+          (expression_statement (string) @function.docstring)?
+        )?
+      ) @function
+
+      (decorated_definition
+        (decorator (identifier) @decorator.name)?
+        definition: (function_definition name: (identifier) @decorated_function.name)
+      ) @decorated
     ]],
     javascript = [[
       (class_declaration name: (identifier) @class.name) @class
@@ -2495,24 +2558,76 @@ function M.get_treesitter_structure()
     return structure
   end
 
+  -- Collect captures by node for richer structure
+  local captures_by_line = {}
+
   for id, node, metadata in query:iter_captures(root, bufnr) do
     local name = query.captures[id]
     local start_row, start_col, end_row, end_col = node:range()
+    local text = vim.treesitter.get_node_text(node, bufnr)
 
-    if name == 'class.name' or name == 'function.name' or name == 'method.name' then
-      local text = vim.treesitter.get_node_text(node, bufnr)
-      local node_type = name:match('(%w+)%.name')
+    -- Track captures by starting line for grouping
+    if not captures_by_line[start_row] then
+      captures_by_line[start_row] = {}
+    end
+    captures_by_line[start_row][name] = {
+      text = text,
+      line = start_row + 1,
+      col = start_col + 1
+    }
 
-      table.insert(structure.children, {
-        type = node_type,
-        name = text,
-        line = start_row + 1,
-        col = start_col + 1
-      })
+    -- Build structure from name captures
+    if name == 'class.name' or name == 'function.name' or name == 'method.name' or name == 'decorated_function.name' then
+      local node_type = name:match('(%w+)%.name') or name:match('(%w+)_function%.name')
+      if node_type == 'decorated_function' then
+        node_type = 'function'
+      end
 
-      debug_log('Found ' .. node_type .. ': ' .. text .. ' at line ' .. (start_row + 1))
+      -- Check if we already have this (avoid duplicates from decorated)
+      local exists = false
+      for _, child in ipairs(structure.children) do
+        if child.name == text and child.line == start_row + 1 then
+          exists = true
+          break
+        end
+      end
+
+      if not exists then
+        local child = {
+          type = node_type,
+          name = text,
+          line = start_row + 1,
+          col = start_col + 1,
+          docstring = nil,
+          params = nil,
+          decorator = nil
+        }
+
+        -- Look for associated captures on nearby lines
+        for offset = 0, 5 do
+          local line_captures = captures_by_line[start_row + offset]
+          if line_captures then
+            if line_captures[node_type .. '.docstring'] then
+              local ds = line_captures[node_type .. '.docstring'].text
+              child.docstring = ds:gsub('^["\']', ''):gsub('["\']$', ''):gsub('\n.*', ''):sub(1, 60)
+            end
+            if line_captures['function.params'] then
+              child.params = line_captures['function.params'].text
+            end
+            if line_captures['decorator.name'] then
+              child.decorator = line_captures['decorator.name'].text
+            end
+          end
+        end
+
+        table.insert(structure.children, child)
+        debug_log('Found ' .. node_type .. ': ' .. text .. ' at line ' .. (start_row + 1))
+      end
     end
   end
+
+  -- Sort by line number
+  table.sort(structure.children, function(a, b) return a.line < b.line end)
 
   return structure
 end
