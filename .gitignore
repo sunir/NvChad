@@ -84,3 +84,4 @@ venv/
 !stories/*.md
 
 # === END COLONY RULES ===
+*.tmp.*
