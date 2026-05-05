@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "packages": [
+    "coding",
+    "testing",
+    "debugging",
+    "planning",
+    "requirements",
+    "meta"
+  ]
+}

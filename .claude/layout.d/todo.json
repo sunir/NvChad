@@ -1,0 +1,30 @@
+{
+  "plugin": "todo",
+  "help": ".todo.json is the task state file managed by the todo CLI. It syncs with Claude's native Task tools (TaskCreate/TaskUpdate/TaskList). Do not create, move, or edit this file manually.",
+  "condition": ".todo.json",
+  "layout": [
+    {
+      "path": ".todo.json",
+      "type": "file",
+      "required": true,
+      "help": "Task state file. Managed by todo CLI and synced via PostToolUse hooks. Do not edit manually or move."
+    }
+  ],
+  "antipatterns": [
+    {
+      "glob": "todo.json",
+      "message": "Task file should be .todo.json (hidden), not todo.json",
+      "help": "The todo CLI expects .todo.json with a leading dot."
+    },
+    {
+      "glob": "todos.json",
+      "message": "Task file should be .todo.json, not todos.json",
+      "help": "The todo CLI expects .todo.json."
+    },
+    {
+      "glob": ".tasks.json",
+      "message": "Task file should be .todo.json, not .tasks.json",
+      "help": "The todo CLI expects .todo.json."
+    }
+  ]
+}

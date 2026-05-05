@@ -1,0 +1,25 @@
+{
+  "plugin": "msg",
+  "help": ".msg/ is the agent mailbox. .msg/inbox is an mbox file holding all messages. Messages are sent/read with the msg CLI. MCP messaging tools are blocked \u2014 always use Bash(msg ...) instead.",
+  "condition": ".msg/",
+  "layout": [
+    {
+      "path": ".msg/inbox",
+      "type": "file",
+      "required": true,
+      "help": "Agent inbox in mbox format. Managed by msg CLI. Do not edit manually or move."
+    }
+  ],
+  "antipatterns": [
+    {
+      "glob": "inbox",
+      "message": "Agent inbox should be at .msg/inbox, not in the repo root",
+      "help": "The msg CLI expects .msg/inbox."
+    },
+    {
+      "glob": "messages/",
+      "message": "Messages belong in .msg/inbox, not messages/",
+      "help": "The msg CLI expects .msg/inbox."
+    }
+  ]
+}

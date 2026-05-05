@@ -1,0 +1,57 @@
+#!/bin/bash
+# Auto-generated hook dispatcher for SessionEnd
+# Type: informational - Plugins run but never block operations
+# Version: unknown (2026-04-15 04:00:00 UTC)
+#
+# WHAT THIS HOOK DOES:
+#   Runs all executable plugins in SessionEnd.d/ directory in priority order
+#   Plugins receive JSON input via stdin
+#   Plugin exit codes determine behavior (see Exit Codes section below)
+#
+# DO NOT EDIT - Managed by: colony hook SessionEnd generate
+#
+# PLUGIN ENVIRONMENT VARIABLES:
+#   HOOK_NAME    - Name of this hook (e.g., "SessionEnd")
+#   PLUGIN_NAME  - Basename of plugin file (e.g., "10-pluginname")
+#   SESSION_ID   - Session identifier (from hook common.sh)
+#   INPUT        - JSON input from Claude Code (from hook common.sh)
+#
+# EXIT CODES:
+#   0 - Success (plugin ran without issues)
+#   1 - Error (logged to stderr, execution continues)
+#   2 - Block operation (behavior depends on hook type)
+
+# Load common boilerplate: sets up PATH, INPUT, SESSION_ID
+source "$(dirname "$0")/lib/common.sh"
+setup_hook_env
+
+HOOK_DIR="$SCRIPT_DIR/SessionEnd.d"
+[[ ! -d "$HOOK_DIR" ]] && exit 0
+
+_run_plugin() {
+    local plugin="$1"
+    [[ "$(basename "$plugin")" == .* ]] && return  # Skip dotfiles
+    [[ -f "$plugin" ]] || return
+
+    export HOOK_NAME="SessionEnd"
+    export PLUGIN_NAME="$(basename "$plugin")"
+
+    # .md files: cat to stderr as static instructions (not executed)
+    if [[ "$plugin" == *.md ]]; then
+        cat "$plugin" >&2
+        return
+    fi
+
+    [[ -x "$plugin" ]] || return
+
+    OUTPUT=$(echo "$INPUT" | "$plugin" 2>&1)
+    EXIT_CODE=$?
+
+    [[ -n "$OUTPUT" ]] && echo "$OUTPUT" >&2
+}
+
+# system/ runs first (policy), then local/ (user scripts)
+for plugin in "$HOOK_DIR/system"/*; do _run_plugin "$plugin"; done
+for plugin in "$HOOK_DIR/local"/*; do _run_plugin "$plugin"; done
+
+exit 0

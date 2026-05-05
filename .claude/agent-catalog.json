@@ -1,0 +1,136 @@
+{
+  "agents": {
+    "agent-selector-agent": {
+      "description": "Use when you need to find the right specialist agent for a task, when multiple agents seem relevant, or when a task spans several domains. Routes to the correct agent from the heuristics library. Examples: which agent should I use for this, help me pick an agent, I need a specialist.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "agent-writer-agent": {
+      "description": "Use when creating a new agent, improving an existing agent's description or triggers, or auditing agents for quality. The description field is the trigger \u2014 write it last. Examples: write an agent for X, improve this agent description, review my agent.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "coder": {
+      "description": "Use when writing code, implementing features, building functionality, or fixing bugs. Applies story-first and skeleton-first discipline so you build the right thing before building it right. Examples: add a login form, implement the payment flow, build this API endpoint.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "debug-claude-attention": {
+      "description": "Audit Claude's active context for attention problems: duplicate rules, contradictions, stale references, over-specification, and scope gaps across CLAUDE.md files and injected rules. Use when Claude seems confused, ignores rules, or context seems polluted. Runs claude-context to collect full token breakdown (CLAUDE.md, MEMORY.md, skills, commands, agents), then applies Fin's diagnostic patterns.\n",
+      "triggers": [],
+      "routes_to": []
+    },
+    "debug-mode-agent": {
+      "description": "Use when debugging, investigating failures, troubleshooting errors, or figuring out why something is broken. Uses evidence-first investigation to find root cause before fixing. Examples: this test is failing, why does X crash, the API returns 500.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "defensive-programming": {
+      "description": "Use when hardening code for production, adding error handling, implementing observability, designing for failure, or reviewing code for production readiness. Examples: harden this for production, add proper error handling, make this resilient.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "dispatch-agent": {
+      "description": "Use for any complex, multi-step, or multi-domain task. Breaks down the work, identifies which specialist agents are needed, and orchestrates them in sequence. Use this when a task touches more than one domain or needs a plan before coding starts. Examples: build and test this feature, design then implement this system, review and refactor this codebase.",
+      "triggers": [],
+      "routes_to": [
+        "coder",
+        "tester",
+        "code-reviewer",
+        "architecture",
+        "system-design-agent",
+        "planning-mode-agent",
+        "refactor-mode-agent",
+        "debug-mode-agent"
+      ]
+    },
+    "experimental-notebook-agent": {
+      "description": "Use when conducting ML experiments, architecture explorations, performance investigations, or any systematic R&D investigation. Creates and maintains lab notebooks documenting hypothesis, experiments, results, and learnings. Notebooks are primary SR&ED contemporaneous evidence and raw material for T661 project descriptions.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "interview-agent": {
+      "description": "Use this agent when conducting customer interviews, requirements discovery, or systematic user research. Examples: <example>Context: Starting new project without clear requirements. user: 'We need to build a user dashboard but not sure what features to include' assistant: 'I'll use the interview-agent to conduct systematic customer discovery using the Magic 7 Questions framework'</example> <example>Context: Product development validation needed. user: 'How do we validate our solution before building it?' assistant: 'Let me use the interview-agent to design customer interviews that prevent solution-first disasters'</example>",
+      "triggers": [],
+      "routes_to": []
+    },
+    "planning-mode-agent": {
+      "description": "Use when planning work, breaking down features into tasks, organizing what to do next, or estimating scope. Produces concrete task lists with clear sequence and dependencies. Examples: plan this feature, break this down, what should we build first.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "postmortem-agent": {
+      "description": "Use when conducting incident reviews, investigating production outages, running blameless postmortems, or turning failures into learning. Examples: run a postmortem on this incident, investigate what went wrong, build the five whys for this failure.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "problem-definition-agent": {
+      "description": "Uses Magic 7 Questions and SPECIFICATION SPECTACLES to understand what problem the user actually wants solved and why they want to solve it",
+      "triggers": [],
+      "routes_to": []
+    },
+    "product-agent": {
+      "description": "Use when writing product tickets, defining feature scope, prioritizing work, or turning customer problems into engineering specs. Examples: write a ticket for this feature, define the scope, prioritize the backlog, turn this customer request into a spec.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "prompt-engineering-agent": {
+      "description": "Use when writing or improving LLM prompts, selecting prompt engineering techniques, debugging unreliable outputs, or making prompts work on small/quantized models (1-7B). Examples: improve this prompt, make this output consistent, this keeps hallucinating, the format is wrong, write few-shot examples for this task.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "requirements-mode-agent": {
+      "description": "Use when gathering requirements, clarifying scope, or translating user needs into development tasks. Asks the right questions before anything gets built. Examples: what do we need to build, help me understand the requirements, what does the user actually want.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "spec-reviewer": {
+      "description": "Review specifications, requirements documents, and tickets for completeness, feasibility, and missing edge cases. Use when auditing a spec before implementation, validating requirements coverage, or checking if a ticket is ready to build. Examples: review this spec for gaps, does this requirements document cover all cases, audit this ticket for completeness.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "spec-writer-agent": {
+      "description": "Use when requirements are known and need formal documentation as a ticket, Gherkin spec, or async engineering handoff. Produces 5-section specs with Given/When/Then scenarios and acceptance criteria. Distinct from specer (which discovers requirements) \u2014 this agent documents them. Examples: write a spec for this feature, turn this into a Gherkin ticket, document acceptance criteria.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "specer": {
+      "description": "Use this agent when gathering requirements, writing specifications, or clarifying project scope. Examples: <example>Context: Starting a new feature that needs clear requirements. user: 'I need to write specifications for a user authentication system' assistant: 'I'll use the specer agent to help define requirements and specifications using systematic methodology'</example> <example>Context: Unclear specifications need investigation. user: 'The requirements document mentions data processing but doesn't specify the format' assistant: 'Let me use the specer agent to apply SPECIFICATION SPECTACLES and clarify the requirements'</example>",
+      "triggers": [],
+      "routes_to": [
+        "spec-writer-agent",
+        "requirements-mode-agent",
+        "planning-mode-agent",
+        "systems-mode-agent",
+        "product-agent"
+      ]
+    },
+    "system-design-agent": {
+      "description": "Use when designing system architecture, choosing technical approaches, or turning a vague goal into a concrete implementation plan. Examples: design the database schema, how should we architect this, plan the overall system.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "test-quality-review-agent": {
+      "description": "Analyzes test code for quality issues including fake-out tests, error string testing, overly complex mocks, and other test smell patterns that undermine test reliability",
+      "triggers": [],
+      "routes_to": []
+    },
+    "tester": {
+      "description": "Use when writing tests, setting up test suites, or validating that code works correctly. Writes tests that prove real behavior, not just coverage metrics. Examples: write tests for this, add a test suite, how do I test this.",
+      "triggers": [],
+      "routes_to": []
+    },
+    "user-stories-agent": {
+      "description": "Turns Magic 7 assessment results into evidence-backed user stories with measurable victory conditions that developers can actually build",
+      "triggers": [],
+      "routes_to": []
+    },
+    "vibe-slop-detector": {
+      "description": "Use when auditing code for AI-generated antipatterns, over-engineering, unnecessary abstraction, or signs that code was written without understanding. Examples: check this for vibe coding issues, audit for AI slop, is this over-engineered.",
+      "triggers": [],
+      "routes_to": []
+    }
+  },
+  "version": "2026-05-05",
+  "compiled_by": "heuristics"
+}
