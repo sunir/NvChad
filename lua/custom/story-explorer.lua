@@ -2482,12 +2482,12 @@ function M.show_lsp_callers()
 end
 
 -- TreeSitter-based code structure extraction (language-agnostic)
+-- Uses main_bufnr (the source file) not current buf (may be the sidebar).
 function M.get_treesitter_structure()
-  local bufnr = vim.api.nvim_get_current_buf()
-  local parser = vim.treesitter.get_parser(bufnr)
-
-  if not parser then
-    debug_log('No TreeSitter parser for current buffer')
+  local bufnr = main_bufnr or vim.api.nvim_get_current_buf()
+  local ok, parser = pcall(vim.treesitter.get_parser, bufnr)
+  if not ok or not parser then
+    debug_log('No TreeSitter parser for buffer ' .. bufnr)
     return nil
   end
 
