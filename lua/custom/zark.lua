@@ -298,7 +298,7 @@ local function open_window()
     local ctx    = state.context
     local agents = available_agents()
     if #agents == 0 then
-      vim.notify("No agents listening (run: zark listen)", vim.log.levels.WARN)
+      vim.notify("No agents logged in (run: zark login)", vim.log.levels.WARN)
       return
     end
     local names = vim.tbl_map(function(a)
