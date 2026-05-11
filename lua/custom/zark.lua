@@ -110,11 +110,8 @@ local function recent_messages(context, limit)
   local log_path = ctx_data and ctx_data.log_path
 
   if not log_path or vim.fn.filereadable(log_path) == 0 then
-    -- Fallback: infer from cwd
-    local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
-    if root ~= "" then
-      log_path = root .. "/.zark-channels/" .. san .. ".jsonl"
-    end
+    -- Fallback: presence dir channels/
+    log_path = ZARK_DIR .. "/channels/" .. san .. ".jsonl"
   end
 
   if not log_path or vim.fn.filereadable(log_path) == 0 then
@@ -217,9 +214,7 @@ local function log_path_for(context)
   local ctx_file = ZARK_DIR .. "/contexts/" .. san .. "/context"
   local ctx_data = read_json(ctx_file)
   if ctx_data and ctx_data.log_path then return ctx_data.log_path end
-  local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
-  if root ~= "" then return root .. "/.zark-channels/" .. san .. ".jsonl" end
-  return nil
+  return ZARK_DIR .. "/channels/" .. san .. ".jsonl"
 end
 
 local function stop_watcher()
