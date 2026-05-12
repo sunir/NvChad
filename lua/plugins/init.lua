@@ -365,10 +365,7 @@ return {
     "tris203/precognition.nvim",
     event = "VeryLazy",
     opts = {
-      startVisible = false,  -- off by default, toggle with <leader>zp
-    },
-    keys = {
-      { "<leader>zp", function() require("precognition").toggle() end, desc = "Toggle motion hints" },
+      startVisible = false,  -- off by default, toggle with :Precognition toggle
     },
   },
 
