@@ -2,15 +2,15 @@ return {
   -- Blink.cmp - faster completion (optional, testing)
   { import = "nvchad.blink.lazyspec" },
 
-  -- Zark (Zany Agent Runtime Kit): writes cursor position to ~/.zark-editor-state
-  -- on InsertLeave so Claude Code hooks can inject editor context into prompts.
+  -- Zark: writes cursor position to editor-state file on InsertLeave
+  -- so Claude Code hooks can inject editor context into prompts.
   {
-    dir = "/Users/sunir/source/colony/zark/neovim",
+    dir = "/Users/sunir/source/colony/zork/neovim",
     name = "zark",
     lazy = false,
     config = function()
       -- lazy adds {dir}/lua/ to path; zark.lua lives in {dir}/ directly
-      local zark_dir = "/Users/sunir/source/colony/zark/neovim"
+      local zark_dir = "/Users/sunir/source/colony/zork/neovim"
       package.path = zark_dir .. "/?.lua;" .. package.path
       require("zark").setup()
     end,
