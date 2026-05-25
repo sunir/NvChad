@@ -49,6 +49,11 @@
       "triggers": [],
       "routes_to": []
     },
+    "ideation-agent": {
+      "description": "Use when you need diverse candidate approaches to a problem \u2014 before speccing, before committing to a direction, or when the obvious solution feels like the only solution. Generates cross-domain analogues, surfaces non-obvious approaches, ranks by feasibility and risk, and names what you'd need to validate each. Does NOT write specs or code. Examples: what approaches exist for X, brainstorm routing strategies, think creatively about this tradeoff, novel ideas for Y.",
+      "triggers": [],
+      "routes_to": []
+    },
     "interview-agent": {
       "description": "Use this agent when conducting customer interviews, requirements discovery, or systematic user research. Examples: <example>Context: Starting new project without clear requirements. user: 'We need to build a user dashboard but not sure what features to include' assistant: 'I'll use the interview-agent to conduct systematic customer discovery using the Magic 7 Questions framework'</example> <example>Context: Product development validation needed. user: 'How do we validate our solution before building it?' assistant: 'Let me use the interview-agent to design customer interviews that prevent solution-first disasters'</example>",
       "triggers": [],
@@ -131,6 +136,6 @@
       "routes_to": []
     }
   },
-  "version": "2026-05-12",
+  "version": "2026-05-24",
   "compiled_by": "heuristics"
 }
