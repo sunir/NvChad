@@ -77,20 +77,11 @@ map("n", "<C-u>", "<C-u>zz", { desc = "Page up and center" })
 map("n", "n", "nzzzv", { desc = "Next search result centered" })
 map("n", "N", "Nzzzv", { desc = "Previous search result centered" })
 
--- Delete without yanking (note: <leader>d is NOT a dungeon prefix — use <leader>z for dungeon)
+-- Delete without yanking
 map({ "n", "v" }, "<leader>d", [["_d]], { desc = "Delete without yanking" })
 
--- Dungeon (Zork-style code navigator) — <leader>z prefix avoids <leader>d conflict
-map("n", "<leader>ze", function() require("dungeon").dungeon() end,  { desc = "Dungeon: enter room" })
-map("n", "<leader>zm", function() require("dungeon").map() end,      { desc = "Dungeon: map" })
-map("n", "<leader>zb", function() require("dungeon").back() end,     { desc = "Dungeon: back" })
-map("n", "<leader>zx", function() require("dungeon").examine() end,  { desc = "Dungeon: examine symbol" })
-map("n", "<leader>zr", function() require("dungeon").reload() end,   { desc = "Dungeon: reload room" })
-map("n", "<leader>zn", function()
-  vim.ui.input({ prompt = "📝 Note: " }, function(text)
-    if text and text ~= "" then require("dungeon").note(text) end
-  end)
-end, { desc = "Dungeon: add note" })
+-- Zork chat sidebar
+map("n", "<leader>z", function() require("zork").toggle() end, { desc = "Zork: toggle chat sidebar" })
 
 -- Paste over visual selection without yanking
 map("x", "<leader>p", [["_dP]], { desc = "Paste without yanking deleted text" })
