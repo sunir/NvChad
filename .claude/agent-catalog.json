@@ -44,6 +44,11 @@
         "debug-mode-agent"
       ]
     },
+    "doc-quality-refactor-agent": {
+      "description": "Use when a directory of documentation files is a hot mess \u2014 mixing function specs, SOPs, narrative, implementation planning, and vendor tables. Audits each file and either rewrites it as a clean typed-contract function, reformats it as a proper SOP, or deletes it as implementation planning noise. Examples: clean up this wiki subdirectory, this docs folder has competing goals, refactor these files into clean contracts, audit this SOP library for noise.",
+      "triggers": [],
+      "routes_to": []
+    },
     "experimental-notebook-agent": {
       "description": "Use when conducting ML experiments, architecture explorations, performance investigations, or any systematic R&D investigation. Creates and maintains lab notebooks documenting hypothesis, experiments, results, and learnings. Notebooks are primary SR&ED contemporaneous evidence and raw material for T661 project descriptions.",
       "triggers": [],
@@ -136,6 +141,6 @@
       "routes_to": []
     }
   },
-  "version": "2026-05-24",
+  "version": "2026-06-08",
   "compiled_by": "heuristics"
 }
