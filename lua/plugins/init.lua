@@ -2,30 +2,30 @@ return {
   -- Blink.cmp - faster completion (optional, testing)
   { import = "nvchad.blink.lazyspec" },
 
-  -- Zark: writes cursor position to editor-state file on InsertLeave
-  -- so Claude Code hooks can inject editor context into prompts.
+  -- Zork cursor context: writes buffer + cursor marker to ~/.config/zork/editor-state
+  -- on InsertLeave so Claude Code hooks can inject editor context into prompts.
   {
     dir = "/Users/sunir/source/colony/zork/neovim",
-    name = "zark",
+    name = "zork-cursor",
     lazy = false,
     config = function()
-      -- lazy adds {dir}/lua/ to path; zark.lua lives in {dir}/ directly
-      local zark_dir = "/Users/sunir/source/colony/zork/neovim"
-      package.path = zark_dir .. "/?.lua;" .. package.path
-      require("zark").setup()
+      local zork_dir = "/Users/sunir/source/colony/zork/neovim"
+      package.path = zork_dir .. "/?.lua;" .. package.path
+      require("zork_cursor").setup()
     end,
   },
 
-  -- Dungeon: Zork-style code navigator. <leader>z* keymaps defined in mappings.lua.
-  -- dungeon.lua is the canonical version (standalone, no morph dep).
+  -- Zork chat sidebar + Dungeon navigator share lua/custom/ — loaded via
+  -- a single dir spec with one config that sets up both modules.
   {
     dir = vim.fn.stdpath("config") .. "/lua/custom",
-    name = "dungeon",
+    name = "custom-plugins",
     lazy = false,
     config = function()
-      vim.g.dungeon_no_keymaps = true
       local custom_dir = vim.fn.stdpath("config") .. "/lua/custom"
       package.path = custom_dir .. "/?.lua;" .. package.path
+      require("zork").setup()
+      vim.g.dungeon_no_keymaps = true
       require("dungeon").setup()
     end,
   },
