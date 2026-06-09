@@ -24,12 +24,6 @@ Log keymaps:
 
 local M = {}
 
--- Top-level load probe: if this file is reached at all, the log gets an entry.
-do
-  local _f = io.open("/Users/sunir/source/colony/zork/nvim.log", "a")
-  if _f then _f:write("[zork] module loaded (top-level)\n"); _f:close() end
-end
-
 local ZORK_BIN   = "zork"
 local ZORK_DIR   = vim.fn.expand("~/.config/zork")
 local STAGE_HEIGHT = 5
@@ -568,44 +562,18 @@ function M.setup(opts)
     for k, v in pairs(opts.name_emoji) do NAME_EMOJI[k] = v end
   end
 
-  -- Printf debug log to /Users/sunir/source/colony/zork/nvim.log
-  local LOG = "/Users/sunir/source/colony/zork/nvim.log"
-  local function zlog(fmt, ...)
-    local msg = string.format("[zork] " .. fmt .. "\n", ...)
-    local f = io.open(LOG, "a")
-    if f then f:write(msg); f:close() end
-  end
-
-  -- Write the primary server address to a known file so external tools
-  -- (Claude) can find the socket without needing to start a new one.
+  -- Write the primary server address so external tools can find the socket.
   -- Deferred to VimEnter: vim.v.servername is empty during early plugin init.
-  local function write_server_file(when)
+  local function write_server_file()
     local _srv = vim.v.servername or ""
-    local _list = vim.fn.serverlist()
-    zlog("write_server_file(%s) servername=%q serverlist=%s", when, _srv, vim.inspect(_list))
-    if #_srv == 0 and #_list > 0 then
-      _srv = _list[1]
-      zlog("  using serverlist[1]=%q", _srv)
-    end
+    if #_srv == 0 and #vim.fn.serverlist() > 0 then _srv = vim.fn.serverlist()[1] end
     if #_srv > 0 then
-      local _f, _err = io.open(ZORK_DIR .. "/nvim-server", "w")
-      if _f then
-        _f:write(_srv); _f:close()
-        zlog("  wrote %s/nvim-server OK", ZORK_DIR)
-      else
-        zlog("  io.open FAILED: %s", tostring(_err))
-      end
-    else
-      zlog("  servername empty — skipping write")
+      local _f = io.open(ZORK_DIR .. "/nvim-server", "w")
+      if _f then _f:write(_srv); _f:close() end
     end
   end
-
-  zlog("M.setup() called ZORK_DIR=%s", ZORK_DIR)
-  write_server_file("immediate")
-  vim.api.nvim_create_autocmd("VimEnter", {
-    once = true,
-    callback = function() write_server_file("VimEnter") end,
-  })
+  write_server_file()
+  vim.api.nvim_create_autocmd("VimEnter", { once = true, callback = write_server_file })
 
   local function _setup_hls()
     vim.api.nvim_set_hl(0, "ZorkMuted", { fg = "#6c7086", italic = true })
