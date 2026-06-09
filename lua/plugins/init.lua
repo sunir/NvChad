@@ -490,16 +490,10 @@ return {
   },
 
   -- image.nvim: inline image rendering via Kitty Graphics Protocol (Ghostty)
+  -- Requires: brew install luarocks && luarocks --local install magick
   {
     "3rd/image.nvim",
     ft = { "markdown" },
-    dependencies = {
-      {
-        "vhyrro/luarocks.nvim",
-        priority = 1001,
-        opts = { rocks = { "magick" } },
-      },
-    },
     opts = {
       backend = "kitty",
       integrations = {
