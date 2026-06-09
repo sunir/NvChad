@@ -34,6 +34,7 @@ local state = {
   win_stage = nil,
   buf_stage = nil,
   context   = nil,
+  agent     = nil,  -- e.g. "zork:nvim:12345"
   watcher   = nil,
 }
 
@@ -296,13 +297,16 @@ local function close()
       end
     end
   end
+  local agent = state.agent
   state.win_log   = nil
   state.buf_log   = nil
   state.win_stage = nil
   state.buf_stage = nil
   state.context   = nil
+  state.agent     = nil
   if ctx then
-    vim.fn.jobstart({ ZORK_BIN, "leave", ctx }, { detach = false })
+    local env = agent and { ZORK_AGENT = agent } or nil
+    vim.fn.jobstart({ ZORK_BIN, "leave", ctx }, { detach = false, env = env })
   end
 end
 
@@ -380,24 +384,6 @@ local function open_sidebar(ctx)
     close()
   end, "Zork: close if empty")
 
-  -- Sentinel auto-send: typing !! at end of last line sends without leaving insert mode
-  vim.api.nvim_create_autocmd("TextChangedI", {
-    buffer = buf_stage,
-    callback = function()
-      local lines = vim.api.nvim_buf_get_lines(buf_stage, 0, -1, false)
-      local last  = lines[#lines] or ""
-      if last:match("!!%s*$") then
-        lines[#lines] = last:gsub("!!%s*$", "")
-        while #lines > 0 and lines[#lines]:match("^%s*$") do lines[#lines] = nil end
-        if #lines > 0 then
-          vim.api.nvim_buf_set_lines(buf_stage, 0, -1, false, lines)
-          vim.cmd("stopinsert")
-          send_staged()
-        end
-      end
-    end,
-  })
-
   -- Rerender when terminal or window dimensions change.
   -- VimResized fires on terminal resize; WinResized fires when split dimensions change.
   -- defer_fn gives Neovim time to update window dimensions before we query them.
@@ -415,12 +401,17 @@ local function open_sidebar(ctx)
       pcall(vim.api.nvim_del_autocmd, guard_id)
       stop_watcher()
       local c = state.context
+      local ag = state.agent
       state.win_stage = nil
       state.buf_stage = nil
       state.win_log   = nil
       state.buf_log   = nil
       state.context   = nil
-      if c then vim.fn.jobstart({ ZORK_BIN, "leave", c }, { detach = false }) end
+      state.agent     = nil
+      if c then
+        local env = ag and { ZORK_AGENT = ag } or nil
+        vim.fn.jobstart({ ZORK_BIN, "leave", c }, { detach = false, env = env })
+      end
     end,
   })
 
@@ -476,7 +467,11 @@ function M.toggle()
   end
 
   state.context = infer_context()
-  vim.fn.jobstart({ ZORK_BIN, "join", state.context }, { detach = true })
+  state.agent   = vim.fn.fnamemodify(vim.fn.getcwd(), ":t") .. ":nvim:" .. vim.fn.getpid()
+  vim.fn.jobstart({ ZORK_BIN, "join", state.context }, {
+    detach = true,
+    env = { ZORK_AGENT = state.agent },
+  })
   open_sidebar(state.context)
   vim.defer_fn(function()
     redraw_log()
