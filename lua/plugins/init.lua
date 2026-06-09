@@ -370,47 +370,95 @@ return {
     },
   },
 
-  -- Softwrap: floating window showing current line wrapped, buffer stays nowrap.
-  -- Replaces vim-softwrap (Vim-only, uses v:versionlong unavailable in Neovim).
+  -- Softwrap hint: when nowrap is active, shows the current line wrapped in a
+  -- borderless dim float below it. Cursor position and visual selection are
+  -- reflected. The line stays editable normally; the float is read-only hint.
   {
-    "nvim-lua/plenary.nvim",  -- already a dep; this entry just registers the autocmd
+    "nvim-lua/plenary.nvim",  -- already a dep; this entry just hooks the autocmds
     lazy = false,
     config = function()
+      local ns = vim.api.nvim_create_namespace("softwrap_hint")
       local float_win = nil
+
+      vim.api.nvim_set_hl(0, "SoftwrapHint",   { fg = "#45475a" })
+      vim.api.nvim_set_hl(0, "SoftwrapCursor", { fg = "#cdd6f4", bold = true })
+      vim.api.nvim_set_hl(0, "SoftwrapSel",    { fg = "#cdd6f4", bg = "#313244" })
+
       local function close_float()
         if float_win and vim.api.nvim_win_is_valid(float_win) then
-          vim.api.nvim_win_close(float_win, true)
+          pcall(vim.api.nvim_win_close, float_win, true)
         end
         float_win = nil
       end
-      vim.api.nvim_create_autocmd("CursorMoved", {
-        pattern = "*.md",
-        callback = function()
-          close_float()
-          local line = vim.api.nvim_get_current_line()
-          local win_w = vim.api.nvim_win_get_width(0)
-          if vim.wo.wrap or #line <= win_w then return end
-          -- Wrap line into chunks
-          local lines = {}
-          local s = line
-          while #s > 0 do
-            table.insert(lines, s:sub(1, win_w))
-            s = s:sub(win_w + 1)
+
+      local function update_float()
+        close_float()
+        if vim.wo.wrap then return end
+        local line = vim.api.nvim_get_current_line()
+        local win_w = vim.api.nvim_win_get_width(0)
+        if #line <= win_w then return end
+
+        -- Split into screen-width chunks
+        local chunks = {}
+        local s = line
+        while #s > 0 do
+          table.insert(chunks, s:sub(1, win_w))
+          s = s:sub(win_w + 1)
+        end
+
+        local buf = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, chunks)
+
+        -- Dim everything
+        for i = 0, #chunks - 1 do
+          vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapHint", i, 0, -1)
+        end
+
+        -- Mark cursor column
+        local cur_col = vim.api.nvim_win_get_cursor(0)[2]
+        local cur_chunk = math.floor(cur_col / win_w)
+        local cur_off   = cur_col % win_w
+        if cur_chunk < #chunks then
+          vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapCursor", cur_chunk, cur_off, cur_off + 1)
+        end
+
+        -- Reflect visual selection (current line only)
+        local mode = vim.fn.mode()
+        if mode == "v" or mode == "V" then
+          local v_col  = vim.fn.col("v") - 1  -- 0-indexed
+          local sel_s  = math.min(v_col, cur_col)
+          local sel_e  = math.max(v_col, cur_col)
+          for col = sel_s, sel_e do
+            local fl = math.floor(col / win_w)
+            local fc = col % win_w
+            if fl < #chunks then
+              vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapSel", fl, fc, fc + 1)
+            end
           end
-          local buf = vim.api.nvim_create_buf(false, true)
-          vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-          local row = vim.api.nvim_win_get_cursor(0)[1]
-          local screen_row = vim.fn.winline()
-          local anchor_row = (screen_row <= #lines + 1) and screen_row or screen_row - #lines - 1
-          float_win = vim.api.nvim_open_win(buf, false, {
-            relative = "win", row = anchor_row, col = 0,
-            width = win_w, height = #lines,
-            style = "minimal", border = "single",
-          })
-          vim.wo[float_win].wrap = true
-        end,
+        end
+
+        -- Position below current screen line, no border
+        local screen_row = vim.fn.winline()  -- 1-based; used as 0-based row = one line below
+        local avail = vim.api.nvim_win_get_height(0) - screen_row
+        local height = math.min(#chunks, math.max(avail, 1))
+
+        float_win = vim.api.nvim_open_win(buf, false, {
+          relative  = "win",
+          row       = screen_row,  -- winline() is 1-based → places float one line below cursor
+          col       = 0,
+          width     = win_w,
+          height    = height,
+          style     = "minimal",
+          border    = "none",
+          focusable = false,
+          zindex    = 50,
+        })
+      end
+
+      vim.api.nvim_create_autocmd({ "CursorMoved", "ModeChanged" }, {
+        callback = update_float,
       })
-      vim.api.nvim_create_autocmd({ "CursorMovedI", "InsertEnter", "BufLeave" }, {
+      vim.api.nvim_create_autocmd({ "CursorMovedI", "InsertEnter", "BufLeave", "WinLeave" }, {
         callback = close_float,
       })
     end,
