@@ -398,12 +398,20 @@ return {
         local win_w = vim.api.nvim_win_get_width(0)
         if #line <= win_w then return end
 
-        -- Split into screen-width chunks
+        -- Split at word boundaries (like linebreak), falling back to hard wrap
         local chunks = {}
         local s = line
         while #s > 0 do
-          table.insert(chunks, s:sub(1, win_w))
-          s = s:sub(win_w + 1)
+          if #s <= win_w then
+            table.insert(chunks, s); break
+          end
+          -- Find last space/punctuation at or before win_w
+          local break_at = win_w
+          for i = win_w, 1, -1 do
+            if s:sub(i, i):match("[ \t%-/|]") then break_at = i; break end
+          end
+          table.insert(chunks, s:sub(1, break_at))
+          s = s:sub(break_at + 1)
         end
 
         local buf = vim.api.nvim_create_buf(false, true)
