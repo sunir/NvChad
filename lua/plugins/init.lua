@@ -369,7 +369,7 @@ return {
         pattern = "*.md",
         callback = function()
           local line = vim.api.nvim_get_current_line()
-          if #line > vim.api.nvim_win_get_width(0) then
+          if #line > vim.api.nvim_win_get_width(0) and vim.fn.exists(":SoftWrapShow") == 2 then
             vim.cmd("SoftWrapShow")
           end
         end,
