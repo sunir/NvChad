@@ -359,6 +359,14 @@ return {
     },
   },
 
+  -- Render markdown: renders MD syntax as rich text in the buffer
+  {
+    "MeanderingProgrammer/render-markdown.nvim",
+    dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-tree/nvim-web-devicons" },
+    ft = { "markdown", "md" },
+    opts = {},
+  },
+
   -- Precognition: shows motion hints (w, b, e, ^, $, {, }) as virtual text
   -- Toggle with :Precognition toggle or <leader>zp
   {
