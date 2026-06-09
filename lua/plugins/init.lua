@@ -359,6 +359,24 @@ return {
     },
   },
 
+  -- Softwrap: popup showing current line wrapped while buffer stays nowrap.
+  -- Auto-triggers on long lines in markdown (keeps tables aligned, readable).
+  {
+    "Aster89/vim-softwrap",
+    ft = { "markdown" },
+    config = function()
+      vim.api.nvim_create_autocmd("CursorMoved", {
+        pattern = "*.md",
+        callback = function()
+          local line = vim.api.nvim_get_current_line()
+          if #line > vim.api.nvim_win_get_width(0) then
+            vim.cmd("SoftWrapShow")
+          end
+        end,
+      })
+    end,
+  },
+
   -- Render markdown: renders MD syntax as rich text in the buffer
   {
     "MeanderingProgrammer/render-markdown.nvim",
