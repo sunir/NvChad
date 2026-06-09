@@ -476,6 +476,13 @@ return {
   {
     "3rd/image.nvim",
     ft = { "markdown" },
+    dependencies = {
+      {
+        "vhyrro/luarocks.nvim",
+        priority = 1001,
+        opts = { rocks = { "magick" } },
+      },
+    },
     opts = {
       backend = "kitty",
       integrations = {
