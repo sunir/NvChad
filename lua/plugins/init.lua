@@ -30,6 +30,17 @@ return {
     end,
   },
 
+  -- Disable indent-blankline for markdown: render-markdown.nvim handles visual
+  -- structure, and ibl triggers a Neovim 0.11.x treesitter conceal_line crash.
+  {
+    "lukas-reineke/indent-blankline.nvim",
+    opts = {
+      exclude = {
+        filetypes = { "markdown" },
+      },
+    },
+  },
+
   -- Override nvim-lspconfig to use our custom config
   {
     "neovim/nvim-lspconfig",
