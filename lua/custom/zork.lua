@@ -270,7 +270,10 @@ local function send_staged()
   local text = table.concat(lines, "\n")
   vim.api.nvim_buf_set_lines(state.buf_stage, 0, -1, false, { "" })
   local user = vim.fn.system("whoami"):gsub("%s+$", "")
-  vim.fn.jobstart({ ZORK_BIN, "send", text }, {
+  local cmd = state.context
+    and { ZORK_BIN, "send", state.context, text }
+    or  { ZORK_BIN, "send", text }
+  vim.fn.jobstart(cmd, {
     env = { ZORK_USER = user },
     on_exit = function(_, code)
       vim.schedule(function()
@@ -597,6 +600,24 @@ function M.setup(opts)
   end, { desc = "Zork: hot-reload plugin" })
   vim.api.nvim_create_user_command("ZorkToggle", M.toggle, { desc = "Zork: open / focus sidebar" })
   vim.api.nvim_create_user_command("ZorkAnchor", M.anchor, { desc = "Zork: anchor comment at file:line" })
+  vim.api.nvim_create_user_command("ZorkSwitch", function(cmd_opts)
+    local new_ctx = vim.trim(cmd_opts.args)
+    if new_ctx == "" then
+      vim.notify("Usage: ZorkSwitch <channel>", vim.log.levels.ERROR)
+      return
+    end
+    local old_ctx = state.context
+    if old_ctx == new_ctx then
+      vim.notify("Already on " .. new_ctx, vim.log.levels.INFO)
+      return
+    end
+    if old_ctx then vim.fn.jobstart({ ZORK_BIN, "leave", old_ctx }, { detach = false }) end
+    state.context = new_ctx
+    vim.fn.jobstart({ ZORK_BIN, "join", new_ctx }, { detach = true })
+    start_watcher(new_ctx)
+    vim.defer_fn(redraw_log, 400)
+    vim.notify("Switched to " .. new_ctx, vim.log.levels.INFO)
+  end, { nargs = 1, desc = "Zork: switch to a different channel" })
 
   -- Debug logging: set ZORK_DEBUG=1 in env or ':let g:zork_debug=1' to enable
   local function zdbg(fmt, ...)
@@ -676,7 +697,10 @@ function M.setup(opts)
         for _, c in ipairs(new_comments) do
           local msg = (#file > 0) and ("[" .. file .. ":" .. c.lnum .. "] " .. c.text) or c.text
           zdbg("sending: %s", msg:sub(1,80))
-          vim.fn.jobstart({ ZORK_BIN, "send", msg }, { env = { ZORK_USER = user } })
+          local send_cmd = state.context
+            and { ZORK_BIN, "send", state.context, msg }
+            or  { ZORK_BIN, "send", msg }
+          vim.fn.jobstart(send_cmd, { env = { ZORK_USER = user } })
         end
       else
         zdbg("no new comments to send")
