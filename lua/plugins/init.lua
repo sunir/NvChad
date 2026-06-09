@@ -380,7 +380,7 @@ return {
       local ns = vim.api.nvim_create_namespace("softwrap_hint")
       local float_win = nil
 
-      vim.api.nvim_set_hl(0, "SoftwrapHint",   { fg = "#45475a" })
+      vim.api.nvim_set_hl(0, "SoftwrapHint",   { fg = "#7f849c" })
       vim.api.nvim_set_hl(0, "SoftwrapCursor", { fg = "#cdd6f4", bold = true })
       vim.api.nvim_set_hl(0, "SoftwrapSel",    { fg = "#cdd6f4", bg = "#313244" })
 
