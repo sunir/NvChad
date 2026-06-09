@@ -7,8 +7,7 @@ local g = vim.g
 -- Disable search highlight
 vim.cmd "set nohls"
 
--- Global default: nowrap (softwrap float handles long lines in markdown)
-opt.wrap = false
+-- Markdown buffers use nowrap (softwrap float handles long lines/tables)
 
 -- Tab settings (2 spaces)
 opt.tabstop = 2
