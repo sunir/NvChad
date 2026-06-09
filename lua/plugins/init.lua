@@ -359,20 +359,48 @@ return {
     },
   },
 
-  -- Softwrap: popup showing current line wrapped while buffer stays nowrap.
-  -- Auto-triggers on long lines in markdown (keeps tables aligned, readable).
+  -- Softwrap: floating window showing current line wrapped, buffer stays nowrap.
+  -- Replaces vim-softwrap (Vim-only, uses v:versionlong unavailable in Neovim).
   {
-    "Aster89/vim-softwrap",
-    ft = { "markdown" },
+    "nvim-lua/plenary.nvim",  -- already a dep; this entry just registers the autocmd
+    lazy = false,
     config = function()
+      local float_win = nil
+      local function close_float()
+        if float_win and vim.api.nvim_win_is_valid(float_win) then
+          vim.api.nvim_win_close(float_win, true)
+        end
+        float_win = nil
+      end
       vim.api.nvim_create_autocmd("CursorMoved", {
         pattern = "*.md",
         callback = function()
+          close_float()
           local line = vim.api.nvim_get_current_line()
-          if #line > vim.api.nvim_win_get_width(0) and vim.fn.exists(":SoftWrapShow") == 2 then
-            vim.cmd("SoftWrapShow")
+          local win_w = vim.api.nvim_win_get_width(0)
+          if #line <= win_w then return end
+          -- Wrap line into chunks
+          local lines = {}
+          local s = line
+          while #s > 0 do
+            table.insert(lines, s:sub(1, win_w))
+            s = s:sub(win_w + 1)
           end
+          local buf = vim.api.nvim_create_buf(false, true)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+          local row = vim.api.nvim_win_get_cursor(0)[1]
+          local screen_row = vim.fn.winline()
+          local anchor_row = (screen_row <= #lines + 1) and screen_row or screen_row - #lines - 1
+          float_win = vim.api.nvim_open_win(buf, false, {
+            relative = "win", row = anchor_row, col = 0,
+            width = win_w, height = #lines,
+            style = "minimal", border = "single",
+          })
+          vim.wo[float_win].wrap = true
         end,
+      })
+      vim.api.nvim_create_autocmd({ "CursorMovedI", "InsertEnter", "BufLeave" }, {
+        callback = close_float,
       })
     end,
   },
