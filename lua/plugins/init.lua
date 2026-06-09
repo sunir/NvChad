@@ -415,20 +415,32 @@ return {
         local win_w = vim.api.nvim_win_get_width(0)
         if #line <= win_w then return end
 
-        -- Split at word boundaries (like linebreak), falling back to hard wrap
+        -- Markdown table row: one cell per line
         local chunks = {}
-        local s = line
-        while #s > 0 do
-          if #s <= win_w then
-            table.insert(chunks, s); break
+        if line:match("^%s*|") then
+          for cell in line:gmatch("|([^|]*)") do
+            local trimmed = cell:match("^%s*(.-)%s*$")
+            if trimmed ~= "" then
+              table.insert(chunks, "| " .. trimmed)
+            end
           end
-          -- Find last space/punctuation at or before win_w
-          local break_at = win_w
-          for i = win_w, 1, -1 do
-            if s:sub(i, i):match("[ \t%-/|]") then break_at = i; break end
+        end
+        -- Fallback: word-boundary wrapping (also used if table had only 1 cell)
+        if #chunks <= 1 then
+          chunks = {}
+          local s = line
+          while #s > 0 do
+            if #s <= win_w then
+              table.insert(chunks, s); break
+            end
+            -- Find last space/punctuation at or before win_w
+            local break_at = win_w
+            for i = win_w, 1, -1 do
+              if s:sub(i, i):match("[ \t%-/|]") then break_at = i; break end
+            end
+            table.insert(chunks, s:sub(1, break_at))
+            s = s:sub(break_at + 1)
           end
-          table.insert(chunks, s:sub(1, break_at))
-          s = s:sub(break_at + 1)
         end
 
         local buf = vim.api.nvim_create_buf(false, true)
@@ -439,10 +451,35 @@ return {
           vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapHint", i, 0, -1)
         end
 
+        -- Map a raw column offset to (chunk_index, offset_within_chunk).
+        -- For table rows, chunks don't align to win_w boundaries, so we track
+        -- cumulative character positions by scanning the original line.
+        local is_table = line:match("^%s*|") and #chunks > 1
+        local function col_to_chunk(col)
+          if not is_table then
+            return math.floor(col / win_w), col % win_w
+          end
+          -- Walk the original line counting past each | separator
+          local pos = 0
+          for ci, chunk in ipairs(chunks) do
+            -- chunk is "| trimmed_cell"; cell starts 2 chars after leading "| "
+            -- find the raw cell start in the original line
+            local raw_cell = chunk:sub(3)  -- strip "| "
+            local cell_start = line:find(raw_cell, pos + 1, true)
+            if cell_start then
+              local cell_end = cell_start + #raw_cell - 1
+              if col >= cell_start - 1 and col <= cell_end then
+                return ci - 1, col - (cell_start - 1)
+              end
+              pos = cell_end
+            end
+          end
+          return #chunks - 1, 0
+        end
+
         -- Mark cursor column
         local cur_col = vim.api.nvim_win_get_cursor(0)[2]
-        local cur_chunk = math.floor(cur_col / win_w)
-        local cur_off   = cur_col % win_w
+        local cur_chunk, cur_off = col_to_chunk(cur_col)
         if cur_chunk < #chunks then
           vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapCursor", cur_chunk, cur_off, cur_off + 1)
         end
@@ -450,12 +487,11 @@ return {
         -- Reflect visual selection (current line only)
         local mode = vim.fn.mode()
         if mode == "v" or mode == "V" then
-          local v_col  = vim.fn.col("v") - 1  -- 0-indexed
-          local sel_s  = math.min(v_col, cur_col)
-          local sel_e  = math.max(v_col, cur_col)
+          local v_col = vim.fn.col("v") - 1  -- 0-indexed
+          local sel_s = math.min(v_col, cur_col)
+          local sel_e = math.max(v_col, cur_col)
           for col = sel_s, sel_e do
-            local fl = math.floor(col / win_w)
-            local fc = col % win_w
+            local fl, fc = col_to_chunk(col)
             if fl < #chunks then
               vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapSel", fl, fc, fc + 1)
             end
