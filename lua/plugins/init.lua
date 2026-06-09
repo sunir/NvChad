@@ -472,6 +472,26 @@ return {
     end,
   },
 
+  -- image.nvim: inline image rendering via Kitty Graphics Protocol (Ghostty)
+  {
+    "3rd/image.nvim",
+    ft = { "markdown" },
+    opts = {
+      backend = "kitty",
+      integrations = {
+        markdown = {
+          enabled = true,
+          clear_in_insert_mode = true,
+          download_remote_images = false,
+          only_render_image_at_cursor = false,
+        },
+      },
+      max_width = 80,
+      max_height = 20,
+      max_height_window_percentage = 40,
+    },
+  },
+
   -- Render markdown: renders MD syntax as rich text in the buffer
   {
     "MeanderingProgrammer/render-markdown.nvim",
