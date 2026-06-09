@@ -15,14 +15,6 @@ vim.api.nvim_create_autocmd({ "InsertLeave" }, {
   end,
 })
 
--- Markdown: nowrap so tables stay aligned (vim-softwrap handles long lines)
-vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
-  pattern = "*.md",
-  callback = function()
-    vim.wo.wrap = false
-  end,
-})
-
 -- Comment highlight colors
 vim.api.nvim_set_hl(0, "Comment", { fg = "#AAAAAA" })
 vim.api.nvim_set_hl(0, "@comment", { link = "Comment" })

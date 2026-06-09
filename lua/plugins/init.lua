@@ -378,7 +378,7 @@ return {
           close_float()
           local line = vim.api.nvim_get_current_line()
           local win_w = vim.api.nvim_win_get_width(0)
-          if #line <= win_w then return end
+          if vim.wo.wrap or #line <= win_w then return end
           -- Wrap line into chunks
           local lines = {}
           local s = line
