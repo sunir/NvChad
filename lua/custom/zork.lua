@@ -6,7 +6,7 @@ zork.lua — Shared chat sidebar
 <leader>z>  anchor comment: pre-fills staging with [file:line] prefix
 
 Layout: two stacked panes in a right sidebar
-  ┌─ repo:owner/name ────────────┐
+  ┌─ repo:zork ───────────────────┐
   │ [10:01] you: hey             │  ← log (readonly, auto-refreshes)
   │ [10:02] claude: hi           │
   ├──────────────────────────────┤
@@ -41,12 +41,6 @@ local state = {
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
 local function infer_context()
-  local remote = vim.fn.system("git remote get-url origin 2>/dev/null"):gsub("\n", "")
-  if remote ~= "" then
-    local name  = remote:gsub("%.git$", ""):match("[^/]+$") or ""
-    local owner = remote:gsub("%.git$", ""):match("([^/:]+)/[^/]+$") or ""
-    if owner ~= "" and name ~= "" then return "repo:" .. owner .. "/" .. name end
-  end
   local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
   if root ~= "" then return "repo:" .. vim.fn.fnamemodify(root, ":t") end
   return "default"
