@@ -2,6 +2,23 @@ return {
   -- Blink.cmp - faster completion (optional, testing)
   { import = "nvchad.blink.lazyspec" },
 
+  -- Override blink.cmp keymaps: remove Up/Down hijack, use C-j/k to navigate
+  {
+    "saghen/blink.cmp",
+    opts = {
+      keymap = {
+        preset = "default",
+        ["<CR>"]    = { "accept", "fallback" },
+        ["<Tab>"]   = { "select_next", "snippet_forward", "fallback" },
+        ["<S-Tab>"] = { "select_prev", "snippet_backward", "fallback" },
+        ["<C-j>"]   = { "select_next", "fallback" },
+        ["<C-k>"]   = { "select_prev", "fallback" },
+        ["<Up>"]    = { "fallback" },
+        ["<Down>"]  = { "fallback" },
+      },
+    },
+  },
+
   -- Zork cursor context: writes buffer + cursor marker to ~/.config/zork/editor-state
   -- on InsertLeave so Claude Code hooks can inject editor context into prompts.
   {
