@@ -356,9 +356,7 @@ redraw_log = function()
   local win_w = (state.win_log and vim.api.nvim_win_is_valid(state.win_log))
                 and vim.api.nvim_win_get_width(state.win_log) or 80
   local lines, hls = render_log(ctx, win_w)
-  vim.bo[state.buf_log].modifiable = true
-  pcall(vim.api.nvim_buf_set_lines, state.buf_log, 0, -1, false, lines)
-  vim.bo[state.buf_log].modifiable = false
+  vim.api.nvim_buf_set_lines(state.buf_log, 0, -1, false, lines)
   -- Clear old highlights then apply new ones
   vim.api.nvim_buf_clear_namespace(state.buf_log, ZORK_NS, 0, -1)
   for _, h in ipairs(hls) do
@@ -737,6 +735,12 @@ local function open_sidebar(ctx)
   ml("]",  function() nav_patch(state.context, 1)  end, "Zork: next patch")
   ml("[",  function() nav_patch(state.context, -1) end, "Zork: prev patch")
   ml("<CR>", open_patch_at_cursor, "Zork: open patch diff")
+  -- Block insert-mode entry so users can't accidentally edit the log.
+  -- The buffer is intentionally kept modifiable (no nomodifiable flag) so
+  -- programmatic writes from redraw_log never cause E21.
+  for _, k in ipairs({"i","I","a","A","o","O","s","S","c","C","d","D","x","X","p","P","u","R"}) do
+    ml(k, "<Nop>", "Zork: read-only log")
+  end
 
   -- Staging keymaps
   local function ms(modes, key, fn, desc)
