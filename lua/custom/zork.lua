@@ -20,6 +20,8 @@ Staging keymaps:
 
 Log keymaps:
   q / r   close / refresh
+  ] / [   next / prev patch
+  <CR>    open diff view for patch at cursor
 --]]
 
 local M = {}
@@ -76,7 +78,12 @@ end
 
 -- ── Name colors and emoji ─────────────────────────────────────────────────────
 
-local ZORK_NS = vim.api.nvim_create_namespace("zork")
+local ZORK_NS    = vim.api.nvim_create_namespace("zork")
+local ZORK_AI_NS = vim.api.nvim_create_namespace("zork_ai_change")
+
+-- Highlight group for AI-changed lines (defined once; cleared on BufWritePost)
+vim.api.nvim_set_hl(0, "ZorkAIChange",     { bg = "#1e3a5f", default = true })
+vim.api.nvim_set_hl(0, "ZorkAIChangeSign", { fg = "#89b4fa", bold = true, default = true })
 
 local PALETTE = {
   "#89b4fa", "#a6e3a1", "#f38ba8", "#fab387",
@@ -156,12 +163,18 @@ local function word_wrap(text, max_w)
   return #result > 0 and result or { "" }
 end
 
+-- patch_lines[ctx] = list of {log_line_idx (0-based), msg} for patch entries.
+-- Rebuilt on every render_log call; used by patch navigator.
+local patch_lines = {}   -- ctx → [{line, msg}, ...]
+local patch_sel   = {}   -- ctx → currently selected patch index (1-based)
+
 -- Returns lines[] and hls[] = {line_idx (0-based), col_s, col_e, hl_group}
 local function render_log(ctx, win_w)
   win_w = win_w or 80
   local lines = { " " .. ctx, string.rep("─", 58) }
   local hls   = {}
   local msgs  = read_messages(ctx)
+  patch_lines[ctx] = {}
   if #msgs == 0 then
     lines[#lines + 1] = "  (no messages yet)"
     return lines, hls
@@ -177,35 +190,166 @@ local function render_log(ctx, win_w)
   end
 
   -- Layout: <name_w cols: label> <space> <[HH:MM] > <message>
-  -- Continuation lines indent to just past the name column
   local indent = string.rep(" ", name_w + 1)
   local msg_w  = math.max(10, win_w - name_w - 1 - TIME_INLINE_LEN)
+
+  local sel_idx = patch_sel[ctx] or 0
 
   for _, msg in ipairs(msgs) do
     local role    = msg.role or "?"
     local text    = msg.text or msg.message or ""
-    local ts      = string.format("[%s] ", (msg.ts or ""):sub(12, 16))  -- "[HH:MM] " = 8 chars
+    local ts      = string.format("[%s] ", (msg.ts or ""):sub(12, 16))
     local who     = msg.npc_name or (role == "user" and "you" or (role == "assistant" and "claude" or role))
-    local label   = rpad_display(name_emoji(who) .. " " .. who .. ":", name_w)
-    local prefix  = label .. " " .. ts  -- name + space + dim time
 
-    local wrapped = word_wrap(text, msg_w)
-    for i, part in ipairs(wrapped) do
+    -- Patch messages: render as a compact file entry with diff stats
+    if role == "patch" then
+      local ctx2   = msg.context or {}
+      local file   = ctx2.file or text
+      local diff   = ctx2.diff or ""
+      local adds   = select(2, diff:gsub("\n%+[^+]", ""))
+      local dels   = select(2, diff:gsub("\n%-[^-]", ""))
+      local stat   = string.format("+%d/-%d", adds, dels)
+      local pidx   = #patch_lines[ctx] + 1
+      local is_sel = (pidx == sel_idx)
+      local marker = is_sel and "▶ 📄" or "  📄"
+      local entry  = string.format("%s %-40s %s  [%s]", marker, file, stat, ts:gsub("%[(.-)%].*", "%1"))
       local line_idx = #lines
-      lines[#lines + 1] = (i == 1 and prefix or indent) .. part
-      if i == 1 then
-        -- name highlight: 0 .. #label bytes
-        hls[#hls + 1] = { line_idx, 0, #label, ensure_hl(who) }
-        -- time highlight: after label + space
-        local ts_start = #label + 1
-        hls[#hls + 1] = { line_idx, ts_start, ts_start + #ts, "ZorkTime" }
+      lines[#lines + 1] = entry
+      patch_lines[ctx][#patch_lines[ctx] + 1] = { line = line_idx, msg = msg }
+      -- Highlight: file name in blue, stats in green/red
+      hls[#hls + 1] = { line_idx, #marker + 1, #marker + 1 + #file, "ZorkAIChangeSign" }
+      if is_sel then
+        hls[#hls + 1] = { line_idx, 0, #entry, "CursorLine" }
+      end
+    else
+      local label   = rpad_display(name_emoji(who) .. " " .. who .. ":", name_w)
+      local prefix  = label .. " " .. ts
+
+      local wrapped = word_wrap(text, msg_w)
+      for i, part in ipairs(wrapped) do
+        local line_idx = #lines
+        lines[#lines + 1] = (i == 1 and prefix or indent) .. part
+        if i == 1 then
+          hls[#hls + 1] = { line_idx, 0, #label, ensure_hl(who) }
+          local ts_start = #label + 1
+          hls[#hls + 1] = { line_idx, ts_start, ts_start + #ts, "ZorkTime" }
+        end
       end
     end
   end
   return lines, hls
 end
 
-local function redraw_log()
+-- Open a scratch buffer showing the unified diff for a patch message.
+-- The buffer uses filetype=diff for syntax highlighting.
+-- Press q to close.
+local function open_diff_view(msg)
+  local ctx = msg.context or {}
+  local file = ctx.file or "(unknown)"
+  local diff = ctx.diff or ""
+  local content = ctx.content
+  local base_content = ctx.base_content
+
+  -- Prefer showing full file diff: base vs agent content side-by-side in diff mode
+  if content and base_content then
+    local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
+    local abs_path = (root ~= "" and (root .. "/" .. file) or file)
+
+    -- Left pane: base (sync_commit state)
+    vim.cmd("vsplit")
+    local base_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(0, base_buf)
+    vim.bo[base_buf].buftype   = "nofile"
+    vim.bo[base_buf].bufhidden = "wipe"
+    vim.bo[base_buf].swapfile  = false
+    vim.api.nvim_buf_set_name(base_buf, "[zork base] " .. file)
+    local base_lines = vim.split(base_content, "\n", { plain = true })
+    if base_lines[#base_lines] == "" then table.remove(base_lines) end
+    vim.api.nvim_buf_set_lines(base_buf, 0, -1, false, base_lines)
+    -- infer filetype from extension
+    local ext = file:match("%.(%w+)$")
+    if ext then pcall(function() vim.bo[base_buf].filetype = ext end) end
+    vim.cmd("diffthis")
+    vim.keymap.set("n", "q", function()
+      vim.cmd("diffoff!")
+      vim.api.nvim_buf_delete(base_buf, { force = true })
+    end, { buffer = base_buf, nowait = true, desc = "Zork: close diff" })
+
+    -- Right pane: agent content
+    vim.cmd("vsplit")
+    local agent_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(0, agent_buf)
+    vim.bo[agent_buf].buftype   = "nofile"
+    vim.bo[agent_buf].bufhidden = "wipe"
+    vim.bo[agent_buf].swapfile  = false
+    vim.api.nvim_buf_set_name(agent_buf, "[zork patch] " .. file)
+    local agent_lines = vim.split(content, "\n", { plain = true })
+    if agent_lines[#agent_lines] == "" then table.remove(agent_lines) end
+    vim.api.nvim_buf_set_lines(agent_buf, 0, -1, false, agent_lines)
+    if ext then pcall(function() vim.bo[agent_buf].filetype = ext end) end
+    vim.cmd("diffthis")
+    vim.keymap.set("n", "q", function()
+      vim.cmd("diffoff!")
+      pcall(vim.api.nvim_buf_delete, base_buf, { force = true })
+      vim.api.nvim_buf_delete(agent_buf, { force = true })
+    end, { buffer = agent_buf, nowait = true, desc = "Zork: close diff" })
+    return
+  end
+
+  -- Fallback: show raw unified diff in a scratch buffer
+  local diff_buf = vim.api.nvim_create_buf(false, true)
+  vim.cmd("vsplit")
+  vim.api.nvim_win_set_buf(0, diff_buf)
+  vim.bo[diff_buf].buftype   = "nofile"
+  vim.bo[diff_buf].bufhidden = "wipe"
+  vim.bo[diff_buf].filetype  = "diff"
+  vim.api.nvim_buf_set_name(diff_buf, "[zork diff] " .. file)
+  local diff_lines = vim.split(diff ~= "" and diff or "(no diff)", "\n", { plain = true })
+  vim.api.nvim_buf_set_lines(diff_buf, 0, -1, false, diff_lines)
+  vim.keymap.set("n", "q", function()
+    vim.api.nvim_buf_delete(diff_buf, { force = true })
+  end, { buffer = diff_buf, nowait = true, desc = "Zork: close diff" })
+end
+
+local redraw_log  -- forward declaration; defined below
+
+-- Navigate to the Nth patch in the log and scroll to it.
+local function nav_patch(ctx, delta)
+  local pl = patch_lines[ctx]
+  if not pl or #pl == 0 then
+    vim.notify("zork: no patches in log", vim.log.levels.INFO)
+    return
+  end
+  local cur = patch_sel[ctx] or 0
+  local next = math.max(1, math.min(#pl, cur + delta))
+  patch_sel[ctx] = next
+  redraw_log()  -- re-render with new selection highlight
+  -- Scroll log window to the selected patch line
+  if state.win_log and vim.api.nvim_win_is_valid(state.win_log) then
+    local target_line = pl[next] and (pl[next].line + 1) or 1
+    pcall(vim.api.nvim_win_set_cursor, state.win_log, { target_line, 0 })
+  end
+end
+
+local function open_patch_at_cursor()
+  local ctx = state.context
+  if not ctx then return end
+  local pl = patch_lines[ctx]
+  if not pl or #pl == 0 then return end
+  local cursor_line = vim.api.nvim_win_get_cursor(state.win_log)[1] - 1  -- 0-based
+  -- Find which patch the cursor is on (or nearest)
+  local best = nil
+  for i, entry in ipairs(pl) do
+    if entry.line == cursor_line then best = i; break end
+    if entry.line <= cursor_line then best = i end
+  end
+  if not best then best = patch_sel[ctx] or 1 end
+  patch_sel[ctx] = best
+  redraw_log()
+  if pl[best] then open_diff_view(pl[best].msg) end
+end
+
+redraw_log = function()
   if not state.buf_log or not vim.api.nvim_buf_is_valid(state.buf_log) then return end
   local ctx = state.context
   if not ctx then return end
@@ -213,7 +357,7 @@ local function redraw_log()
                 and vim.api.nvim_win_get_width(state.win_log) or 80
   local lines, hls = render_log(ctx, win_w)
   vim.bo[state.buf_log].modifiable = true
-  vim.api.nvim_buf_set_lines(state.buf_log, 0, -1, false, lines)
+  pcall(vim.api.nvim_buf_set_lines, state.buf_log, 0, -1, false, lines)
   vim.bo[state.buf_log].modifiable = false
   -- Clear old highlights then apply new ones
   vim.api.nvim_buf_clear_namespace(state.buf_log, ZORK_NS, 0, -1)
@@ -226,6 +370,230 @@ local function redraw_log()
     -- zb: scroll so last line sits at bottom of window (not just "visible")
     vim.api.nvim_win_call(state.win_log, function() vim.cmd("normal! zb") end)
   end
+end
+
+-- ── Patch stream (W8) ────────────────────────────────────────────────────────
+
+-- Track the last line of the log we've processed for patches (avoids re-applying).
+local patch_cursor = {}  -- ctx → line count already processed
+
+local function parse_hunks(diff)
+  -- Parse a unified diff string into a list of hunks.
+  -- Each hunk: { start (1-based), old_lines, new_lines }
+  local hunks = {}
+  local hunk = nil
+  for line in (diff .. "\n"):gmatch("([^\n]*)\n") do
+    local a, b = line:match("^@@ %-(%d+),?%d* %+(%d+),?%d* @@")
+    if a then
+      if hunk then hunks[#hunks + 1] = hunk end
+      hunk = { start = tonumber(a), old_lines = {}, new_lines = {} }
+    elseif hunk then
+      local c = line:sub(1, 1)
+      if c == "-" then
+        hunk.old_lines[#hunk.old_lines + 1] = line:sub(2)
+      elseif c == "+" then
+        hunk.new_lines[#hunk.new_lines + 1] = line:sub(2)
+      elseif c == " " then
+        hunk.old_lines[#hunk.old_lines + 1] = line:sub(2)
+        hunk.new_lines[#hunk.new_lines + 1] = line:sub(2)
+      end
+    end
+  end
+  if hunk then hunks[#hunks + 1] = hunk end
+  return hunks
+end
+
+local function lines_match(actual, expected)
+  if #actual ~= #expected then return false end
+  for i, v in ipairs(expected) do
+    if actual[i] ~= v then return false end
+  end
+  return true
+end
+
+-- Mark lines changed by AI: gutter sign + line highlight via extmarks.
+-- old_lines / new_lines are 0-indexed line arrays (from nvim_buf_get_lines).
+local function mark_ai_changes(bufnr, old_lines, new_lines)
+  vim.api.nvim_buf_clear_namespace(bufnr, ZORK_AI_NS, 0, -1)
+  local n = math.max(#old_lines, #new_lines)
+  for i = 0, n - 1 do
+    local old = old_lines[i + 1]
+    local new = new_lines[i + 1]
+    if old ~= new then
+      pcall(vim.api.nvim_buf_set_extmark, bufnr, ZORK_AI_NS, i, 0, {
+        sign_text     = "🤖",
+        sign_hl_group = "ZorkAIChangeSign",
+        line_hl_group = "ZorkAIChange",
+      })
+    end
+  end
+  -- Clear marks when the user saves (accepting the AI changes)
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    buffer = bufnr,
+    once   = true,
+    callback = function()
+      vim.api.nvim_buf_clear_namespace(bufnr, ZORK_AI_NS, 0, -1)
+    end,
+  })
+end
+
+-- 3-way merge via git merge-file. Writes three temp files, runs merge-file,
+-- reads result. Returns {lines, had_conflicts} where lines is the merged content
+-- and had_conflicts is true if conflict markers are present.
+local function three_way_merge(base_content, ours_lines, theirs_content)
+  local tmp = vim.fn.tempname
+  local base_f   = tmp() .. ".base"
+  local ours_f   = tmp() .. ".ours"
+  local theirs_f = tmp() .. ".theirs"
+
+  -- Write base (sync_commit state)
+  local fb = io.open(base_f, "w"); if fb then fb:write(base_content); fb:close() end
+  -- Write ours (current buffer)
+  local fo = io.open(ours_f, "w")
+  if fo then fo:write(table.concat(ours_lines, "\n") .. "\n"); fo:close() end
+  -- Write theirs (agent content)
+  local ft = io.open(theirs_f, "w"); if ft then ft:write(theirs_content); ft:close() end
+
+  -- git merge-file -p writes merged output to stdout; exit 0=clean, 1=conflicts, >1=error
+  local result = vim.fn.system({
+    "git", "merge-file", "-p",
+    "--marker-size=7",
+    ours_f, base_f, theirs_f,
+  })
+  local exit_code = vim.v.shell_error
+
+  -- Clean up temp files
+  vim.fn.delete(base_f); vim.fn.delete(ours_f); vim.fn.delete(theirs_f)
+
+  if exit_code > 1 then return nil, false end  -- error; caller falls back
+  local lines = vim.split(result, "\n", { plain = true })
+  if lines[#lines] == "" then table.remove(lines) end
+  local had_conflicts = exit_code == 1
+  return lines, had_conflicts
+end
+
+local function apply_patch_msg(msg)
+  -- Apply a role:"patch" message to the matching open buffer.
+  -- If buffer is clean: whole-buffer replace (agent content wins, undoable).
+  -- If buffer is dirty and base_content present: 3-way merge via git merge-file.
+  --   Clean result → apply. Conflicts → report to agent, leave buffer untouched.
+  -- Falls back to hunk-by-hunk apply if no content provided.
+  -- NEVER writes to disk — only modifies the Neovim buffer.
+  local ctx = msg.context or {}
+  local file = ctx.file
+  local diff = ctx.diff
+  local content = ctx.content
+  local base_content = ctx.base_content
+  if not file or (not content and (not diff or diff == "")) then return {} end
+
+  -- Find the buffer for this file (repo-relative path)
+  local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
+  local abs_path = (root ~= "" and (root .. "/" .. file) or file)
+  local bufnr = vim.fn.bufnr(abs_path)
+  if bufnr == -1 then
+    -- File not open in Neovim — skip. Never write to disk from the patch applicator.
+    return {}
+  end
+  if not vim.bo[bufnr].modifiable then
+    -- Buffer is protected (readonly/nomodifiable) — leave it untouched.
+    return {}
+  end
+
+  if content then
+    local is_dirty = vim.bo[bufnr].modified
+    -- 3-way merge when buffer has unsaved edits and we have the common ancestor
+    if is_dirty and base_content then
+      local ours_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      local merged_lines, had_conflicts = three_way_merge(base_content, ours_lines, content)
+      if merged_lines and not had_conflicts then
+        -- Clean merge: apply without touching human's cursor position
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, merged_lines)
+        mark_ai_changes(bufnr, ours_lines, merged_lines)
+        return {}
+      elseif merged_lines and had_conflicts then
+        -- Conflicts: leave buffer untouched, report back to agent
+        local task_id = ctx.task_id
+        return {{ file = file, hunk = 0,
+                  user_has = ours_lines,
+                  agent_wanted = { old = {}, new = vim.split(content, "\n", { plain = true }) },
+                  conflict_type = "merge_conflict" }}
+      end
+      -- merge-file error: fall through to whole-buffer replace
+    end
+
+    -- Clean buffer (or merge unavailable): whole-buffer replace
+    local lines = vim.split(content, "\n", { plain = true })
+    if lines[#lines] == "" then table.remove(lines) end
+    local old_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    mark_ai_changes(bufnr, old_lines, lines)
+    return {}
+  end
+
+  -- Fallback: hunk-by-hunk apply
+  local hunks = parse_hunks(diff)
+  local conflicts = {}
+  -- Apply in reverse order so line numbers stay valid
+  for i = #hunks, 1, -1 do
+    local h = hunks[i]
+    local s = h.start - 1  -- 0-based
+    local e = s + #h.old_lines
+    local actual = vim.api.nvim_buf_get_lines(bufnr, s, e, false)
+    if lines_match(actual, h.old_lines) then
+      vim.api.nvim_buf_set_lines(bufnr, s, e, false, h.new_lines)
+    else
+      conflicts[#conflicts + 1] = {
+        file = file, hunk = i,
+        user_has = actual,
+        agent_wanted = { old = h.old_lines, new = h.new_lines },
+      }
+    end
+  end
+  return conflicts
+end
+
+local function send_patch_conflicts(conflicts, task_id, channel)
+  if #conflicts == 0 then return end
+  for _, c in ipairs(conflicts) do
+    local ctx_json = vim.json.encode({
+      task_id      = task_id,
+      file         = c.file,
+      hunk         = c.hunk,
+      user_has     = c.user_has,
+      agent_wanted = c.agent_wanted,
+    })
+    -- zork patch conflict <channel> <ctx_json>: sends role:patch_conflict message
+    local cmd = channel
+      and { ZORK_BIN, "patch", "conflict", channel, ctx_json }
+      or  { ZORK_BIN, "patch", "conflict", ctx_json }
+    vim.fn.jobstart(cmd, { detach = true })
+    vim.notify("zork: patch conflict in " .. c.file .. " hunk " .. c.hunk
+               .. " — sent to agent", vim.log.levels.WARN)
+  end
+end
+
+local function process_new_patches(ctx)
+  -- Check log for new patch messages since patch_cursor[ctx].
+  local path = log_path_for(ctx)
+  local f = io.open(path, "r")
+  if not f then return end
+  local all = {}
+  for line in f:lines() do
+    local ok, msg = pcall(vim.json.decode, line)
+    if ok and msg then all[#all + 1] = msg end
+  end
+  f:close()
+  local seen = patch_cursor[ctx] or 0
+  if #all <= seen then return end
+  for i = seen + 1, #all do
+    local msg = all[i]
+    if msg.role == "patch" then
+      local conflicts = apply_patch_msg(msg)
+      local task_id = (msg.context or {}).task_id
+      send_patch_conflicts(conflicts, task_id, ctx)
+    end
+  end
+  patch_cursor[ctx] = #all
 end
 
 -- ── Watcher ───────────────────────────────────────────────────────────────────
@@ -249,7 +617,10 @@ local function start_watcher(ctx)
     if debounce then debounce:stop() end
     debounce = vim.defer_fn(function()
       debounce = nil
-      vim.schedule(redraw_log)
+      vim.schedule(function()
+        redraw_log()
+        process_new_patches(ctx)
+      end)
     end, 150)
   end)
   state.watcher = handle
@@ -363,6 +734,9 @@ local function open_sidebar(ctx)
   ml("q",     close,      "Zork: close")
   ml("<Esc>", close,      "Zork: close")
   ml("r",     redraw_log, "Zork: refresh")
+  ml("]",  function() nav_patch(state.context, 1)  end, "Zork: next patch")
+  ml("[",  function() nav_patch(state.context, -1) end, "Zork: prev patch")
+  ml("<CR>", open_patch_at_cursor, "Zork: open patch diff")
 
   -- Staging keymaps
   local function ms(modes, key, fn, desc)
@@ -462,6 +836,7 @@ function M.toggle()
 
   state.context = infer_context()
   state.agent   = vim.fn.fnamemodify(vim.fn.getcwd(), ":t") .. ":nvim:" .. vim.fn.getpid()
+  patch_cursor[state.context] = nil  -- start fresh; only apply patches sent after join
   vim.fn.jobstart({ ZORK_BIN, "join", state.context }, {
     detach = true,
     env = { ZORK_AGENT = state.agent },
