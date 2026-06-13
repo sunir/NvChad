@@ -409,6 +409,11 @@ return {
       end
 
       local function update_float()
+        -- In markdown, auto-toggle wrap: table rows get nowrap, everything else wraps
+        if vim.bo.filetype == "markdown" then
+          vim.wo.wrap = not vim.api.nvim_get_current_line():match("^%s*|")
+        end
+
         close_float()
         if vim.wo.wrap then return end
         local line = vim.api.nvim_get_current_line()
@@ -521,6 +526,15 @@ return {
       })
       vim.api.nvim_create_autocmd({ "CursorMovedI", "InsertEnter", "BufLeave", "WinLeave" }, {
         callback = close_float,
+      })
+
+      -- Restore wrap when leaving a markdown buffer (in case we left on a table row)
+      vim.api.nvim_create_autocmd({ "BufLeave", "WinLeave" }, {
+        callback = function()
+          if vim.bo.filetype == "markdown" then
+            vim.wo.wrap = true
+          end
+        end,
       })
     end,
   },

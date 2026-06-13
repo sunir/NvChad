@@ -3,7 +3,7 @@ transcripts/
 
 # === COLONY MANAGED RULES ===
 # Do not edit - managed by: colony git sync
-# Last sync: 2026-05-24 20:51:57
+# Last sync: 2026-06-11 08:46:31
 
 # Prohibit patterns (must ignore)
 *.backup*
@@ -53,12 +53,14 @@ transcripts/
 .msg/
 .pipes/
 .project.json
+.qa-review/
 .status-pin
 .status.yaml
 .strictmode
 .todo*
 .venv/
 .vscode/
+.zork/
 __pycache__/
 core/.rag-statusline
 core/.todo-statusline
@@ -68,6 +70,7 @@ mail/cur/*
 mail/new/*
 mail/tmp/*
 node_modules/
+projects/
 qa.jsonl
 rag_index/
 rules/*/[0-9][0-9]-*.md
