@@ -409,19 +409,23 @@ local function lines_match(actual, expected)
   return true
 end
 
--- Mark lines changed by AI: gutter sign + line highlight via extmarks.
+-- Mark lines changed by AI: gutter sign + line highlight + virtual text via extmarks.
 -- old_lines / new_lines are 0-indexed line arrays (from nvim_buf_get_lines).
 local function mark_ai_changes(bufnr, old_lines, new_lines)
   vim.api.nvim_buf_clear_namespace(bufnr, ZORK_AI_NS, 0, -1)
+  local buf_len = vim.api.nvim_buf_line_count(bufnr)
   local n = math.max(#old_lines, #new_lines)
   for i = 0, n - 1 do
     local old = old_lines[i + 1]
     local new = new_lines[i + 1]
-    if old ~= new then
-      pcall(vim.api.nvim_buf_set_extmark, bufnr, ZORK_AI_NS, i, 0, {
-        sign_text     = "🤖",
-        sign_hl_group = "ZorkAIChangeSign",
-        line_hl_group = "ZorkAIChange",
+    if old ~= new and i < buf_len then
+      vim.api.nvim_buf_set_extmark(bufnr, ZORK_AI_NS, i, 0, {
+        sign_text      = "🤖",
+        sign_hl_group  = "ZorkAIChangeSign",
+        line_hl_group  = "ZorkAIChange",
+        priority       = 150,
+        virt_text      = { { " 🤖", "ZorkAIChangeSign" } },
+        virt_text_pos  = "eol",
       })
     end
   end
