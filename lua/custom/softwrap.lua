@@ -90,15 +90,19 @@ function M.setup()
 
     local is_table = line:match("^%s*|") and #chunks > 1
 
-    -- Prepend column heading as inline virtual text (dark red) for table rows
+    -- Prepend column heading as inline virtual text (dark red) for table rows.
+    -- Pad all headers to the same width so the | characters align vertically.
     if is_table then
-      local bufnr = vim.api.nvim_get_current_buf()
-      local lnum  = vim.api.nvim_win_get_cursor(0)[1] - 1
+      local bufnr  = vim.api.nvim_get_current_buf()
+      local lnum   = vim.api.nvim_win_get_cursor(0)[1] - 1
       local headers = find_table_headers(bufnr, lnum)
+      local max_w  = 0
+      for _, hdr in ipairs(headers) do max_w = math.max(max_w, #hdr) end
       for i, hdr in ipairs(headers) do
         if i <= #chunks then
+          local padded = hdr .. string.rep(" ", max_w - #hdr)
           vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
-            virt_text     = { { hdr .. "  ", "SoftwrapHeader" } },
+            virt_text     = { { padded .. "  ", "SoftwrapHeader" } },
             virt_text_pos = "inline",
           })
         end
@@ -119,7 +123,7 @@ function M.setup()
         if cell_start then
           local cell_end = cell_start + #raw_cell - 1
           if col >= cell_start - 1 and col <= cell_end then
-            return ci - 1, col - (cell_start - 1)
+            return ci - 1, 2 + col - (cell_start - 1)  -- +2 for "| " prefix in float buffer
           end
           pos = cell_end
         end
