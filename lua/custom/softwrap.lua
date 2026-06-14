@@ -4,10 +4,12 @@ function M.setup()
   local ns = vim.api.nvim_create_namespace("softwrap_hint")
   local float_win = nil
 
-  vim.api.nvim_set_hl(0, "SoftwrapHint",   { fg = "#7f849c" })
-  vim.api.nvim_set_hl(0, "SoftwrapCursor", { fg = "#cdd6f4", bold = true })
+  local bg = "#0d1a2e"
+  vim.api.nvim_set_hl(0, "SoftwrapFloat",  { bg = bg })
+  vim.api.nvim_set_hl(0, "SoftwrapHint",   { fg = "#7f849c", bg = bg })
+  vim.api.nvim_set_hl(0, "SoftwrapCursor", { fg = "#cdd6f4", bg = bg, bold = true })
   vim.api.nvim_set_hl(0, "SoftwrapSel",    { fg = "#cdd6f4", bg = "#313244" })
-  vim.api.nvim_set_hl(0, "SoftwrapHeader", { fg = "#8B2020", bold = true })
+  vim.api.nvim_set_hl(0, "SoftwrapHeader", { fg = "#8B2020", bg = bg, bold = true })
 
   -- Scan upward from lnum (0-indexed) for the |---| separator, then return
   -- the cells of the header row above it.
@@ -128,7 +130,14 @@ function M.setup()
           pos = cell_end
         end
       end
-      return #chunks - 1, 0
+      -- cursor is on a | separator or trailing space; count pipes up to and
+      -- including col (1-indexed string scan) to find which separator it is.
+      local pipe_count = 0
+      for i = 1, col + 1 do
+        if line:sub(i, i) == "|" then pipe_count = pipe_count + 1 end
+      end
+      -- Nth | → chunk N-1 (0-based); highlight the | at display position 0.
+      return math.min(math.max(pipe_count - 1, 0), #chunks - 1), 0
     end
 
     -- Mark cursor column
@@ -168,6 +177,7 @@ function M.setup()
       focusable = false,
       zindex    = 50,
     })
+    vim.wo[float_win].winhl = "Normal:SoftwrapFloat"
   end
 
   vim.api.nvim_create_autocmd({ "CursorMoved", "ModeChanged" }, {
