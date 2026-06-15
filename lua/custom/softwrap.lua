@@ -139,11 +139,19 @@ function M.setup()
     end
 
     local buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].filetype = ""   -- prevent filetype-based syntax
+    vim.bo[buf].syntax   = ""
+    pcall(vim.treesitter.stop, buf)  -- stop treesitter if it auto-attached
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, chunks)
 
-    -- Dim all text
+    -- Dim all text; priority 200 beats treesitter (100) in case it fires anyway
     for i = 0, #chunks - 1 do
-      vim.api.nvim_buf_add_highlight(buf, ns, "SoftwrapHint", i, 0, -1)
+      vim.api.nvim_buf_set_extmark(buf, ns, i, 0, {
+        end_row  = i,
+        end_col  = #chunks[i + 1],
+        hl_group = "SoftwrapHint",
+        priority = 200,
+      })
     end
 
     -- Inline header labels (table mode only)
