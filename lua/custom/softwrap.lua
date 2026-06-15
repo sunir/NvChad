@@ -7,6 +7,7 @@ function M.setup()
   local bg = "#0d1a2e"
   vim.api.nvim_set_hl(0, "SoftwrapFloat",  { bg = bg })
   vim.api.nvim_set_hl(0, "SoftwrapHint",   { fg = "#7f849c", bg = bg })
+  vim.api.nvim_set_hl(0, "SoftwrapPipe",   { fg = "#000000", bg = bg })
   vim.api.nvim_set_hl(0, "SoftwrapCursor", { fg = "#cdd6f4", bg = bg, bold = true })
   vim.api.nvim_set_hl(0, "SoftwrapSel",    { fg = "#cdd6f4", bg = "#313244" })
   vim.api.nvim_set_hl(0, "SoftwrapHeader", { fg = "#8B2020", bg = bg, bold = true })
@@ -152,6 +153,15 @@ function M.setup()
         hl_group = "SoftwrapHint",
         priority = 200,
       })
+      -- Paint "| " prefix black so virtual pipes don't look like real buffer pipes
+      if is_table or chunks[i + 1]:sub(1, 2) == "| " then
+        vim.api.nvim_buf_set_extmark(buf, ns, i, 0, {
+          end_row  = i,
+          end_col  = 2,
+          hl_group = "SoftwrapPipe",
+          priority = 300,
+        })
+      end
     end
 
     -- Inline header labels (table mode only)
