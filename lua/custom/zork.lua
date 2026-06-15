@@ -844,7 +844,16 @@ function M.toggle()
 
   state.context = infer_context()
   state.agent   = vim.fn.fnamemodify(vim.fn.getcwd(), ":t") .. ":nvim:" .. vim.fn.getpid()
-  patch_cursor[state.context] = nil  -- start fresh; only apply patches sent after join
+  -- Set patch_cursor to current log length so only patches arriving AFTER this
+  -- join are applied to buffers. Re-applying old patches is a no-op for content
+  -- but erases marks (mark_ai_changes sees old==new and sets nothing).
+  do
+    local _path = log_path_for(state.context)
+    local _f = io.open(_path, "r")
+    local _n = 0
+    if _f then for _ in _f:lines() do _n = _n + 1 end; _f:close() end
+    patch_cursor[state.context] = _n
+  end
   vim.fn.jobstart({ ZORK_BIN, "join", state.context }, {
     detach = true,
     env = { ZORK_AGENT = state.agent },
@@ -972,6 +981,33 @@ function M.setup(opts)
   end, { desc = "Zork: hot-reload plugin" })
   vim.api.nvim_create_user_command("ZorkToggle", M.toggle, { desc = "Zork: open / focus sidebar" })
   vim.api.nvim_create_user_command("ZorkAnchor", M.anchor, { desc = "Zork: anchor comment at file:line" })
+  vim.api.nvim_create_user_command("ZorkDebugMarks", function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, ZORK_AI_NS, 0, -1, { details = true })
+    local ctx   = state.context or "(none)"
+    local pc    = patch_cursor[ctx] or 0
+    local pl    = patch_lines[ctx] or {}
+    local lines = {
+      "=== ZorkDebugMarks ===",
+      ("buf=%d  ctx=%s  patch_cursor=%d  patch_log_entries=%d"):format(bufnr, ctx, pc, #pl),
+      ("AI extmarks on this buffer: %d"):format(#marks),
+    }
+    for i, m in ipairs(marks) do
+      lines[#lines + 1] = ("  [%d] line=%d col=%d"):format(i, m[2], m[3])
+    end
+    local log_path = log_path_for(ctx)
+    local f = io.open(log_path, "r")
+    local patch_count = 0
+    if f then
+      for line in f:lines() do
+        local ok, msg = pcall(vim.json.decode, line)
+        if ok and msg and msg.role == "patch" then patch_count = patch_count + 1 end
+      end
+      f:close()
+    end
+    lines[#lines + 1] = ("patch messages in log: %d  log=%s"):format(patch_count, log_path)
+    vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+  end, { desc = "Zork: show AI change mark state for current buffer" })
   vim.api.nvim_create_user_command("ZorkSwitch", function(cmd_opts)
     local new_ctx = vim.trim(cmd_opts.args)
     if new_ctx == "" then
