@@ -3,6 +3,7 @@ local M = {}
 function M.setup()
   local ns = vim.api.nvim_create_namespace("softwrap_hint")
   local float_win = nil
+  local auto_nowrap_wins = {}  -- windows where WE set nowrap; don't touch user-set nowrap
 
   local bg = "#0d1a2e"
   vim.api.nvim_set_hl(0, "SoftwrapFloat",  { bg = bg })
@@ -59,9 +60,22 @@ function M.setup()
   end
 
   local function update_float()
-    -- In markdown, auto-toggle wrap: table rows get nowrap, everything else wraps.
+    -- In markdown, auto-toggle wrap on table rows — but only touch wrap if WE
+    -- are managing it (don't override a manual :set nowrap).
     if vim.bo.filetype == "markdown" then
-      vim.wo.wrap = not vim.api.nvim_get_current_line():match("^%s*|")
+      local win = vim.api.nvim_get_current_win()
+      local on_table = vim.api.nvim_get_current_line():match("^%s*|") ~= nil
+      if on_table then
+        if vim.wo.wrap then  -- wrap is on → we're turning it off
+          auto_nowrap_wins[win] = true
+          vim.wo.wrap = false
+        end
+      else
+        if auto_nowrap_wins[win] then  -- we turned it off → restore
+          auto_nowrap_wins[win] = nil
+          vim.wo.wrap = true
+        end
+      end
     end
 
     close_float()
@@ -241,10 +255,12 @@ function M.setup()
     callback = close_float,
   })
 
-  -- Restore wrap when leaving a markdown buffer (in case we left on a table row)
+  -- Restore wrap when leaving a window where we set nowrap
   vim.api.nvim_create_autocmd({ "BufLeave", "WinLeave" }, {
     callback = function()
-      if vim.bo.filetype == "markdown" then
+      local win = vim.api.nvim_get_current_win()
+      if auto_nowrap_wins[win] then
+        auto_nowrap_wins[win] = nil
         vim.wo.wrap = true
       end
     end,
