@@ -50,8 +50,9 @@ _run_plugin() {
     [[ -n "$OUTPUT" ]] && echo "$OUTPUT" >&2
 }
 
-# system/ runs first (policy), then local/ (user scripts)
+# system/ runs first (policy), then plugin/ (colony plugins), then local/ (user scripts)
 for plugin in "$HOOK_DIR/system"/*; do _run_plugin "$plugin"; done
+for plugin in "$HOOK_DIR/plugin"/*; do _run_plugin "$plugin"; done
 for plugin in "$HOOK_DIR/local"/*; do _run_plugin "$plugin"; done
 
 exit 0
