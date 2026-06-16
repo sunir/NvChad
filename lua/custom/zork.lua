@@ -671,9 +671,10 @@ local function close()
   state.buf_stage = nil
   state.context   = nil
   state.agent     = nil
-  if ctx then
-    local env = agent and { ZORK_AGENT = agent } or nil
-    vim.fn.jobstart({ ZORK_BIN, "leave", ctx }, { detach = false, env = env })
+  -- Only leave if we know the nvim agent identity; without it we'd
+  -- accidentally remove the Claude agent's subscription (cwd default).
+  if ctx and agent then
+    vim.fn.jobstart({ ZORK_BIN, "leave", ctx }, { detach = false, env = { ZORK_AGENT = agent } })
   end
 end
 
@@ -784,9 +785,10 @@ local function open_sidebar(ctx)
       state.buf_log   = nil
       state.context   = nil
       state.agent     = nil
-      if c then
-        local env = ag and { ZORK_AGENT = ag } or nil
-        vim.fn.jobstart({ ZORK_BIN, "leave", c }, { detach = false, env = env })
+      -- Only leave if we know the nvim agent identity; without it we'd
+      -- accidentally remove the Claude agent's subscription (cwd default).
+      if c and ag then
+        vim.fn.jobstart({ ZORK_BIN, "leave", c }, { detach = false, env = { ZORK_AGENT = ag } })
       end
     end,
   })
@@ -1023,7 +1025,9 @@ function M.setup(opts)
       vim.notify("Already on " .. new_ctx, vim.log.levels.INFO)
       return
     end
-    if old_ctx then vim.fn.jobstart({ ZORK_BIN, "leave", old_ctx }, { detach = false }) end
+    if old_ctx and state.agent then
+      vim.fn.jobstart({ ZORK_BIN, "leave", old_ctx }, { detach = false, env = { ZORK_AGENT = state.agent } })
+    end
     state.context = new_ctx
     vim.fn.jobstart({ ZORK_BIN, "join", new_ctx }, { detach = true })
     start_watcher(new_ctx)
