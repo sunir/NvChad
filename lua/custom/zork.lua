@@ -1,7 +1,7 @@
 --[[
 zork.lua — Shared chat sidebar
 
-<leader>z   open sidebar / focus staging (never closes)
+<leader>z   open sidebar / focus staging / close if already in sidebar
 <leader>zq  close sidebar
 <leader>z>  anchor comment: pre-fills staging with [file:line] prefix
 
@@ -835,9 +835,13 @@ function M.toggle()
   local stage_open = state.win_stage and vim.api.nvim_win_is_valid(state.win_stage)
 
   if log_open or stage_open then
-    -- Always focus staging; never close from <leader>z (use q or <leader>zq)
-    if vim.api.nvim_get_current_win() ~= state.win_stage then
-      vim.api.nvim_set_current_win(state.win_stage)
+    local cur = vim.api.nvim_get_current_win()
+    if cur == state.win_stage or cur == state.win_log then
+      -- Already in sidebar — toggle means close
+      close()
+    else
+      -- Not in sidebar — focus staging
+      if stage_open then vim.api.nvim_set_current_win(state.win_stage) end
     end
     return
   end
