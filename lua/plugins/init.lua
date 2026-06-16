@@ -45,6 +45,7 @@ return {
       vim.g.dungeon_no_keymaps = true
       require("dungeon").setup()
       require("softwrap").setup()
+      require("braillefold").setup()
     end,
   },
 
