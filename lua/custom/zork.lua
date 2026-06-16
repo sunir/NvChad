@@ -1,8 +1,7 @@
 --[[
 zork.lua — Shared chat sidebar
 
-<leader>z   open sidebar / focus staging / close if already in sidebar
-<leader>zq  close sidebar
+<leader>z   open sidebar / focus staging / hide if already in sidebar
 <leader>z>  anchor comment: pre-fills staging with [file:line] prefix
 
 Layout: two stacked panes in a right sidebar
@@ -16,10 +15,9 @@ Layout: two stacked panes in a right sidebar
 
 Staging keymaps:
   <C-CR>  send staged text to channel, clear scratchpad
-  q       (normal mode, staging empty) close sidebar
 
 Log keymaps:
-  q / r   close / refresh
+  r       refresh
   ] / [   next / prev patch
   <CR>    open diff view for patch at cursor
 --]]
@@ -707,7 +705,7 @@ local function open_sidebar(ctx)
   vim.wo[win_stage].wrap        = true
   vim.wo[win_stage].linebreak   = true
   vim.wo[win_stage].breakindent = false
-  vim.wo[win_stage].statusline  = "  <C-CR> send  q close"
+  vim.wo[win_stage].statusline  = "  <C-CR> send  <leader>z hide"
 
   state.buf_log   = buf_log
   state.win_log   = win_log
@@ -734,7 +732,6 @@ local function open_sidebar(ctx)
   local function ml(key, fn, desc)
     vim.keymap.set("n", key, fn, { buffer = buf_log, nowait = true, desc = desc })
   end
-  ml("q",     close,      "Zork: close")
   ml("<Esc>", close,      "Zork: close")
   ml("r",     redraw_log, "Zork: refresh")
   ml("]",  function() nav_patch(state.context, 1)  end, "Zork: next patch")
@@ -755,11 +752,6 @@ local function open_sidebar(ctx)
     vim.cmd("stopinsert")
     send_staged()
   end, "Zork: send")
-  ms("n", "q", function()
-    local lines = vim.api.nvim_buf_get_lines(buf_stage, 0, -1, false)
-    for _, l in ipairs(lines) do if l:match("%S") then return end end
-    close()
-  end, "Zork: close if empty")
 
   -- Rerender when terminal or window dimensions change.
   -- VimResized fires on terminal resize; WinResized fires when split dimensions change.
@@ -978,7 +970,7 @@ function M.setup(opts)
   })
 
   vim.keymap.set("n", "<leader>z",  M.toggle, { desc = "Zork: open / focus sidebar" })
-  vim.keymap.set("n", "<leader>Zq", close,    { desc = "Zork: close sidebar" })
+
   vim.keymap.set("n", "<leader>Z>", M.anchor, { desc = "Zork: anchor comment at file:line" })
   vim.keymap.set("n", "<leader>ZR", function()
     package.loaded["zork"] = nil
