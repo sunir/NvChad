@@ -396,19 +396,6 @@ return {
     opts = {},
   },
 
-  -- Smear cursor: animated cursor trail when jumping between distant positions
-  -- Remove by deleting this block and running :Lazy clean
-  {
-    "sphamba/smear-cursor.nvim",
-    lazy = false,
-    opts = {
-      smear_between_buffers      = true,
-      smear_between_neighbor_lines = true,
-      scroll_buffer_space        = true,
-      legacy_computing_symbols_support = false,
-    },
-  },
-
   -- Precognition: shows motion hints (w, b, e, ^, $, {, }) as virtual text
   -- Toggle with :Precognition toggle or <leader>zp
   {
