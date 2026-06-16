@@ -11,31 +11,46 @@ local function is_blank(line)
   return line:match("^%s*$") ~= nil
 end
 
--- Extract a human-readable label from the first meaningful line of the fold.
--- Tries to grab function/class/section names.
+-- Returns {label, hl_group} by inspecting the first meaningful fold line.
 local function extract_label(line)
-  if not line then return "" end
-  -- Strip leading whitespace
+  if not line then return "", "Comment" end
   local s = line:match("^%s*(.-)%s*$")
-  -- Lua function
-  local label = s:match("^local%s+function%s+([%w_%.]+)")
-    or s:match("^function%s+([%w_%.]+)")
-    -- JS/TS function / arrow
-    or s:match("^[a-zA-Z_$][%w_$]*%s*[:=]%s*function")
-    and s:match("^([a-zA-Z_$][%w_$]*)")
-    -- class / def / fn / sub
-    or s:match("^class%s+([%w_]+)")
-    or s:match("^def%s+([%w_]+)")
-    or s:match("^fn%s+([%w_]+)")
-    or s:match("^sub%s+([%w_]+)")
-    -- Markdown heading
-    or s:match("^#+%s+(.+)")
-  if label then return label end
-  -- Fall back: first 30 chars of the stripped line
-  if #s > 30 then
-    return s:sub(1, 30) .. "…"
+
+  local label
+  local hl = "Normal"
+
+  -- Markdown heading → @markup.heading
+  local heading = s:match("^(#+%s+.+)")
+  if heading then
+    return heading, "@markup.heading"
   end
-  return s
+
+  -- Lua function
+  label = s:match("^local%s+function%s+([%w_%.]+)")
+       or s:match("^function%s+([%w_%.]+)")
+  if label then return label, "@function" end
+
+  -- Python def / Rust fn
+  label = s:match("^def%s+([%w_]+)")
+       or s:match("^async%s+def%s+([%w_]+)")
+       or s:match("^fn%s+([%w_]+)")
+  if label then return label, "@function" end
+
+  -- Class / type
+  label = s:match("^class%s+([%w_]+)")
+       or s:match("^struct%s+([%w_]+)")
+       or s:match("^enum%s+([%w_]+)")
+       or s:match("^interface%s+([%w_]+)")
+  if label then return label, "@type" end
+
+  -- JS/TS named function or arrow
+  label = s:match("^[a-zA-Z_$][%w_$]*%s*[:=]%s*function")
+       and s:match("^([a-zA-Z_$][%w_$]*)")
+  if label then return label, "@function" end
+
+  -- Fallback: first 30 chars, no special highlight
+  if #s > 30 then return s:sub(1, 30) .. "…", "Normal" end
+  return s, "Normal"
 end
 
 -- Build the braille minimap string for the given lines.
@@ -78,7 +93,6 @@ function M.foldtext()
   local fend   = vim.v.foldend
   local nlines = fend - fstart + 1
 
-  -- Fetch up to MAX_BRAILLE_CHARS * 4 lines for the minimap
   local fetch_count = math.min(nlines, MAX_BRAILLE_CHARS * 4)
   local ok, lines = pcall(
     vim.api.nvim_buf_get_lines,
@@ -88,11 +102,16 @@ function M.foldtext()
     return ("+-- %d lines "):format(nlines)
   end
 
-  local strip = build_minimap(lines, MAX_BRAILLE_CHARS)
-  local label = extract_label(lines[1])
-  local count_str = ("  (%d lines)"):format(nlines)
+  local strip            = build_minimap(lines, MAX_BRAILLE_CHARS)
+  local label, label_hl  = extract_label(lines[1])
+  local count_str        = ("  (%d lines)"):format(nlines)
 
-  return strip .. "  " .. label .. count_str
+  -- Return highlight pair list (Neovim 0.10+)
+  return {
+    { strip .. "  ", "Comment"  },
+    { label,         label_hl   },
+    { count_str,     "Comment"  },
+  }
 end
 
 -- Maps the cursor column within the braille strip to a proportional line in the fold,
