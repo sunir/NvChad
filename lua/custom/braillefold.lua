@@ -1,8 +1,10 @@
 local M = {}
 
--- Braille 2×4 grid: left column bits (rows 0-3), right column bits (rows 0-3)
-local LEFT  = { 0x01, 0x02, 0x04, 0x40 }
-local RIGHT = { 0x08, 0x10, 0x20, 0x80 }
+-- Fill from bottom: depth n fills n+1 rows bottom-up — deeper nesting = taller bar.
+-- Left column bits (bottom-up): dot7=0x40, dot3=0x04, dot2=0x02, dot1=0x01
+-- Right column bits (bottom-up): dot8=0x80, dot6=0x20, dot5=0x10, dot4=0x08
+local LEFT_FILL  = { 0x40, 0x44, 0x46, 0x47 }  -- depths 0-3 on left column
+local RIGHT_FILL = { 0x80, 0xA0, 0xB0, 0xB8 }  -- depths 0-3 on right column
 
 local MAX_CHARS = 30  -- max braille characters in strip
 
@@ -108,6 +110,9 @@ local function build_strip(bufnr, fstart, lines, max_chars)
     end
   end
 
+  local prev_depth = 0
+  local prev_hl    = "Comment"
+
   for i = 0, pairs_needed - 1 do
     local li_a = i * 2 + 1
     local li_b = i * 2 + 2
@@ -122,8 +127,15 @@ local function build_strip(bufnr, fstart, lines, max_chars)
       depth_b, hl_b = -1, "Comment"
     end
 
-    local bit_a = depth_a >= 0 and LEFT[depth_a + 1]  or 0
-    local bit_b = depth_b >= 0 and RIGHT[depth_b + 1] or 0
+    -- Blank lines inherit the previous non-blank line's depth/color so the
+    -- terrain stays solid rather than breaking into scattered single dots.
+    if depth_a < 0 then depth_a, hl_a = prev_depth, prev_hl
+    else prev_depth, prev_hl = depth_a, hl_a end
+    if depth_b < 0 then depth_b, hl_b = depth_a, hl_a
+    else prev_depth, prev_hl = depth_b, hl_b end
+
+    local bit_a = LEFT_FILL[depth_a + 1]
+    local bit_b = RIGHT_FILL[depth_b + 1]
 
     if hl_a == hl_b then
       -- Same color: one character
