@@ -705,7 +705,7 @@ local function open_sidebar(ctx)
   vim.wo[win_stage].wrap        = true
   vim.wo[win_stage].linebreak   = true
   vim.wo[win_stage].breakindent = false
-  vim.wo[win_stage].statusline  = "  <C-CR> send  <leader>z hide"
+  vim.wo[win_stage].statusline  = "  Ctrl-Enter: send"
 
   state.buf_log   = buf_log
   state.win_log   = win_log
