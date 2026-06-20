@@ -8,29 +8,26 @@ local RIGHT = { 0x08, 0x10, 0x20, 0x80 }
 
 local MAX_CHARS = 30  -- max braille characters in strip
 
--- Map treesitter node type → highlight group
+-- Map treesitter node type → highlight group.
+-- Only declarations and literals; control-flow and statements fall through to grey.
 local NODE_HL = {
-  -- Definitions
+  -- String literals and docstrings
+  string                = "@string",
+  comment               = "@comment",
+  -- Function/method declarations (the def/fn line itself)
   function_definition   = "@function",
   function_declaration  = "@function",
   method_definition     = "@function",
   method_declaration    = "@function",
   arrow_function        = "@function",
   local_function        = "@function",
-  -- Types / structure
+  -- Type/class declarations
   class_definition      = "@type",
   class_declaration     = "@type",
   struct_item           = "@type",
   enum_item             = "@type",
   interface_declaration = "@type",
-  -- Control flow
-  if_statement          = "@keyword.conditional",
-  elseif_clause         = "@keyword.conditional",
-  for_statement         = "@keyword.repeat",
-  for_in_statement      = "@keyword.repeat",
-  while_statement       = "@keyword.repeat",
-  do_statement          = "@keyword.repeat",
-  -- Markdown
+  -- Markdown headings
   atx_heading           = "@markup.heading",
   setext_heading        = "@markup.heading",
   section               = "@markup.heading",
@@ -38,14 +35,15 @@ local NODE_HL = {
 
 local function node_hl(node)
   if not node then return "Comment" end
-  -- Walk up to find the first named ancestor with a known type
-  local n = node
-  for _ = 1, 6 do
-    local hl = NODE_HL[n:type()]
+  -- Check node itself (catches string, comment, class_definition, function_definition)
+  local hl = NODE_HL[node:type()]
+  if hl then return hl end
+  -- Check direct parent only — the def/class name identifier lives one level up from
+  -- the declaration node, but body statements must NOT inherit their enclosing scope's color.
+  local p = node:parent()
+  if p then
+    hl = NODE_HL[p:type()]
     if hl then return hl end
-    local p = n:parent()
-    if not p then break end
-    n = p
   end
   return "Comment"
 end
