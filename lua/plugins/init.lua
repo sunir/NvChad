@@ -407,4 +407,57 @@ return {
     },
   },
 
+  -- mkdnflow: wiki-link navigation for markdown — [[wikilinks]], backlinks,
+  -- follow/create links, to-do list toggling, table formatting
+  {
+    "jakewvincent/mkdnflow.nvim",
+    ft = { "markdown", "md" },
+    opts = {
+      modules = {
+        bib        = false,  -- no BibTeX
+        buffers    = true,
+        conceal    = false,
+        cursor     = true,
+        folds      = false,  -- keep our braillefold
+        links      = true,
+        lists      = true,
+        maps       = true,
+        paths      = true,
+        tables     = true,
+        yaml       = false,
+      },
+      filetypes   = { md = true, markdown = true },
+      create_dirs = true,
+      perspective = {
+        priority = "root",   -- resolve links relative to wiki root
+        fallback = "current",
+        root_tell = "index.md",
+      },
+      links = {
+        style         = "wiki",  -- [[wikilink]] style
+        name_is_source = false,
+        conceal       = false,
+        context       = 0,
+        implicit_extension = nil,
+        transform_implicit = false,
+        transform_explicit = function(text)
+          return text:gsub(" ", "-"):lower()
+        end,
+      },
+      to_do = {
+        symbols  = { " ", "-", "X" },
+        update_parents = true,
+        not_started = " ",
+        in_progress = "-",
+        complete    = "X",
+      },
+      tables = {
+        trim_whitespace    = true,
+        format_on_move     = true,
+        auto_extend_rows   = false,
+        auto_extend_cols   = false,
+      },
+    },
+  },
+
 }
