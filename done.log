@@ -2,3 +2,8 @@
 [todo ] Add mkdnflow.nvim to plugins — user said 'yes please' in prior session, deferred while working on braillefold
   # Added mkdnflow.nvim to lua/plugins/init.lua with wiki-link style, table formatting, to-do toggling; folds disabled to preserve braillefold. Pushed 784d370.
 
+# 2026-06-23T16:08:30.672364-04:00 | branch:heads/v2.5 | commit:6e85167
+[todo ] Add tunnelvision.nvim to plugins — user asked about it, assessed: focus/tracking plugin that dims non-symbol lines. Need user confirmation to add.
+  # waiting for user to confirm whether to add tunnelvision.nvim
+  # Added tunnelvision.nvim to lua/plugins/init.lua, dynamic mode, leader+tv/tn/tp keymaps. Pushed 6e85167.
+
