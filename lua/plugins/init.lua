@@ -407,6 +407,22 @@ return {
     },
   },
 
+  -- Tunnelvision: dims all lines except occurrences of the symbol under cursor.
+  -- Modes: static (lock), dynamic (follow cursor), flow (expands to assignments).
+  -- Toggle with <leader>tv; navigate matches with <leader>tn / <leader>tp.
+  {
+    "leolaurindo/tunnelvision.nvim",
+    event = "VeryLazy",
+    config = function()
+      require("tunnelvision").setup({
+        mode = "dynamic",
+      })
+      vim.keymap.set("n", "<leader>tv", "<cmd>TunnelvisionToggle<cr>",  { desc = "Toggle tunnelvision" })
+      vim.keymap.set("n", "<leader>tn", "<cmd>TunnelvisionNext<cr>",    { desc = "Next tunnelvision match" })
+      vim.keymap.set("n", "<leader>tp", "<cmd>TunnelvisionPrev<cr>",    { desc = "Prev tunnelvision match" })
+    end,
+  },
+
   -- mkdnflow: wiki-link navigation for markdown — [[wikilinks]], backlinks,
   -- follow/create links, to-do list toggling, table formatting
   {
