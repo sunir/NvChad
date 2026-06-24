@@ -82,7 +82,10 @@ function M.setup()
     if vim.wo.wrap then return end
     local line = vim.api.nvim_get_current_line()
     local win_w = vim.api.nvim_win_get_width(0)
-    if #line <= win_w then return end
+    local is_table_row = line:match("^%s*|") ~= nil
+    -- Always show the float for table rows (consistent column-label UX),
+    -- even when the line fits in the window.
+    if not is_table_row and #line <= win_w then return end
 
     local chunks       = {}  -- display lines for the float buffer
     local chunk_hdr    = {}  -- virt_text label (padded header or blanks)
