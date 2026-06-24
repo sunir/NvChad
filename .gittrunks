@@ -1,0 +1,3 @@
+# Trunk branches for this repo — not orphans, intentional long-lived branches.
+# gitorphans will skip these when checking for unmerged branches.
+v2.5
