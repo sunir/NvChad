@@ -21,10 +21,12 @@ return {
 
   -- Zork cursor context: writes buffer + cursor marker to ~/.config/zork/editor-state
   -- on InsertLeave so Claude Code hooks can inject editor context into prompts.
+  -- Only loaded when the local colony checkout exists (Mac dev machine).
   {
     dir = "/Users/sunir/source/colony/zork/neovim",
     name = "zork-cursor",
     lazy = false,
+    enabled = vim.fn.isdirectory("/Users/sunir/source/colony/zork/neovim") == 1,
     config = function()
       local zork_dir = "/Users/sunir/source/colony/zork/neovim"
       package.path = zork_dir .. "/?.lua;" .. package.path
