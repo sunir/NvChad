@@ -442,7 +442,6 @@ return {
         tables     = true,
         yaml       = false,
       },
-      filetypes   = { md = true, markdown = true },
       create_dirs = true,
       perspective = {
         priority = "root",   -- resolve links relative to wiki root
@@ -461,11 +460,13 @@ return {
         end,
       },
       to_do = {
-        symbols  = { " ", "-", "X" },
-        update_parents = true,
-        not_started = " ",
-        in_progress = "-",
-        complete    = "X",
+        statuses = {
+          not_started = { marker = " " },
+          in_progress = { marker = "-" },
+          complete    = { marker = "X" },
+        },
+        status_order = { "not_started", "in_progress", "complete" },
+        status_propagation = { up = true },
       },
       tables = {
         trim_whitespace    = true,
