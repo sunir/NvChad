@@ -4,6 +4,12 @@ local o = vim.o
 local opt = vim.opt
 local g = vim.g
 
+-- Enable 24-bit color when the terminal supports it.
+-- Ghostty and most modern terminals set COLORTERM=truecolor.
+if vim.env.COLORTERM == "truecolor" or vim.env.COLORTERM == "24bit" then
+  opt.termguicolors = true
+end
+
 -- Disable search highlight
 vim.cmd "set nohls"
 
