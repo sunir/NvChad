@@ -1,5 +1,6 @@
 transcripts/
 .status-pin
+.homeostat/
 
 # === COLONY MANAGED RULES ===
 # Do not edit - managed by: colony git sync
