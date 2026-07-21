@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "next_id": 4,
+    "schema_version": "1.3"
+  },
+  "todos": [
+    {
+      "type": "fold",
+      "content": "specs",
+      "status": "hide",
+      "id": 1
+    }
+  ]
+}

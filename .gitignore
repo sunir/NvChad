@@ -3,7 +3,7 @@ transcripts/
 
 # === COLONY MANAGED RULES ===
 # Do not edit - managed by: colony git sync
-# Last sync: 2026-06-11 08:46:31
+# Last sync: 2026-07-21 08:28:11
 
 # Prohibit patterns (must ignore)
 *.backup*
@@ -50,10 +50,12 @@ transcripts/
 .focusmode-log
 .focusmode-search-done
 .idea/
+.maintain/state.json
 .msg/
 .pipes/
 .project.json
 .qa-review/
+.schedule/state.json
 .status-pin
 .status.yaml
 .strictmode
@@ -66,11 +68,11 @@ core/.rag-statusline
 core/.todo-statusline
 core/compressed-context.json
 issues/
+logs/
 mail/cur/*
 mail/new/*
 mail/tmp/*
 node_modules/
-projects/
 qa.jsonl
 rag_index/
 rules/*/[0-9][0-9]-*.md
@@ -78,7 +80,6 @@ rules/*/plugin/
 rules/*/system/
 rules/99-plan.md
 rules/[0-9][0-9]-*.md
-sessions/*
 timelog.json
 todos/
 transcripts/
@@ -87,6 +88,7 @@ venv/
 # Require patterns (must track)
 !.claude/commands/
 !.claude/hooks/
+!.todo.json
 !CLAUDE.md
 !core/emoji
 !core/focus.md
