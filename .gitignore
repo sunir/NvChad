@@ -1,6 +1,5 @@
 transcripts/
 .status-pin
-.homeostat/
 
 # === COLONY MANAGED RULES ===
 # Do not edit - managed by: colony git sync
@@ -45,11 +44,15 @@ transcripts/
 .claude/worktrees/
 .codex/
 .colony
+.colony.stop
 .deploy
 .empathy
 .focusmode
 .focusmode-log
 .focusmode-search-done
+.homeostat/automode-monitor.last
+.homeostat/cycle-total
+.homeostat/inactive-git-sync.last
 .idea/
 .maintain/state.json
 .msg/
