@@ -45,9 +45,17 @@ sleep-hooks
 # the paths this step actually means to snapshot.
 git add -- sessions/ core/ 2>/dev/null
 git diff --cached --quiet -- sessions/ core/ || git commit -m "chore: nap — session handoff" -- sessions/ core/
-mkdir -p .automode && touch .automode/context-napped
-rm -f .automode/context-fill-fired .automode/context-warn
-automode relax
+# Only mark napped if automode is ON — mkdir-p would re-enable it if it was intentionally OFF
+if [[ -d .automode ]]; then
+  touch .automode/context-napped
+  rm -f .automode/context-fill-fired .automode/context-warn
+  automode relax
+fi
 ```
 
-This is the last step. Stop after this.
+This is the last step of the handoff — but not the last step of your turn.
+Nap is a checkpoint, not an exit: continue with whatever you were doing
+before context-fill interrupted you. Don't end your turn here, and don't
+run /nap or /sleep again — the context-fill watcher won't nudge you again
+until a real compaction happens (`automode.d/05-context-fill` now respects
+`.automode/context-napped`, cleared by PreCompact).
