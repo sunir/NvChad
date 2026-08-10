@@ -76,6 +76,8 @@ return {
   -- via the build hook.
   {
     "nvim-treesitter/nvim-treesitter",
+    -- NvChad omits TSUpdate/TSUninstall from cmd, so Lazy never loads the plugin for them.
+    cmd = { "TSInstall", "TSUpdate", "TSUninstall", "TSBufEnable", "TSBufDisable", "TSModuleInfo" },
     build = function()
       -- Install parsers that aren't bundled with Neovim (c/lua/markdown/vim/vimdoc are).
       local to_install = {
