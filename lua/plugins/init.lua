@@ -70,50 +70,34 @@ return {
     end,
   },
 
-  -- Override treesitter with custom parsers
+  -- nvim-treesitter 1.0: removed configs.lua API, ensure_installed, highlight/indent setup.
+  -- Parsers are installed per-language with :TSInstall. Highlighting/indent are Neovim
+  -- built-in (0.11+). We override only to set the install dir and kick off missing parsers
+  -- via the build hook.
   {
     "nvim-treesitter/nvim-treesitter",
-    opts = {
-      ensure_installed = {
-        "vim",
-        "lua",
-        "html",
-        "css",
-        "javascript",
-        "typescript",
-        "tsx",
-        "c",
-        "markdown",
-        "markdown_inline",
-        "python",
-        "json",
-        "yaml",
-        "bash",
-        "jsdoc",
-        "comment",
-      },
-      highlight = {
-        enable = true,
-        additional_vim_regex_highlighting = false,
-        disable = function(lang, buf)
-          local max_filesize = 100 * 1024 -- 100 KB
-          local ok, stats = pcall(vim.uv.fs_stat, vim.api.nvim_buf_get_name(buf))
-          if ok and stats and stats.size > max_filesize then
-            return true
+    build = function()
+      -- Install parsers that aren't bundled with Neovim (c/lua/markdown/vim/vimdoc are).
+      local to_install = {
+        "html", "css", "javascript", "typescript", "tsx",
+        "python", "json", "yaml", "bash", "jsdoc", "comment",
+      }
+      require("nvim-treesitter.install").install(to_install, { summary = true })
+    end,
+    config = function()
+      -- 1.0 API: only install_dir is meaningful here.
+      require("nvim-treesitter").setup({})
+
+      -- Large-file guard: disable treesitter highlight for files > 100 KB.
+      vim.api.nvim_create_autocmd("BufReadPre", {
+        callback = function(args)
+          local ok, stats = pcall(vim.uv.fs_stat, vim.api.nvim_buf_get_name(args.buf))
+          if ok and stats and stats.size > 100 * 1024 then
+            vim.treesitter.stop(args.buf)
           end
         end,
-      },
-      indent = { enable = true },
-      incremental_selection = {
-        enable = true,
-        keymaps = {
-          init_selection = "<C-space>",
-          node_incremental = "<C-space>",
-          scope_incremental = "<nop>",
-          node_decremental = "<bs>",
-        },
-      },
-    },
+      })
+    end,
   },
 
   -- Treesitter text objects - vaf (select function), vic (select class), etc.
