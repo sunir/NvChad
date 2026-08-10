@@ -432,7 +432,7 @@ return {
       },
       create_dirs = true,
       perspective = {
-        priority = "root",   -- resolve links relative to wiki root
+        priority = "current",
         fallback = "current",
         root_tell = "index.md",
       },
