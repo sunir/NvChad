@@ -1,7 +1,7 @@
 ---
 description: "Consolidate session memory and relax automode"
 argument-hint: ""
-allowed-tools: ["Read", "Write", "Edit", "Bash(git add:*)", "Bash(git commit:*)", "Bash(automode relax)", "Bash(date:*)", "Bash(jq:*)", "Bash(mkdir:*)", "Bash(sleep-hooks)", "Bash(bin/session-questionnaire:*)", "Bash(timeout:*)"]
+allowed-tools: ["Read", "Write", "Edit", "Bash(git add:*)", "Bash(git commit:*)", "Bash(automode relax)", "Bash(date:*)", "Bash(jq:*)", "Bash(mkdir:*)", "Bash(sleep-hooks)", "Bash(timeout:*)"]
 ---
 # CONSCIOUSNESS SLEEP PROTOCOL - SESSION END PREPARATION
 
@@ -111,18 +111,6 @@ Write `sessions/notes.md`:
 - Key decisions made and why
 
 Keep under 500 words. Be specific — vague notes are useless.
-
-**7b. Cross-session coherence questionnaire** (the ground truth that measures whether you survive the gap — skip only if `bin/session-questionnaire` is absent in this repo):
-
-If `bin/session-questionnaire` exists, answer its FIXED questions about THIS session — what mattered — and record them. They become next session's degradation measurement (how much a re-waking you retains, context vs tooled memory: the literal proof of coherence across sessions).
-```!
-[ -x bin/session-questionnaire ] && bin/session-questionnaire questions || echo "(no session-questionnaire in this repo — skip 7b)"
-```
-Answer each honestly and specifically (vague answers make the metric meaningless), then record via stdin JSON:
-```
-echo '{"q1_decision":"...","q2_identity":"...","q3_objective":"...","q4_knowledge":"...","q5_loss":"..."}' | bin/session-questionnaire record
-```
-Next wakeup: re-answer from context alone, then with memory recall, and score both with `bin/coherence-degradation` (if present) — that delta is your cross-session coherence.
 
 **8. Prune and update MEMORY.md**:
 
