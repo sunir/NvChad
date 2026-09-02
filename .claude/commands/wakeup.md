@@ -1,7 +1,7 @@
 ---
 description: "Read previous session notes to restore context"
 argument-hint: ""
-allowed-tools: ["Read", "Bash(jq:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(rag:*)", "Bash(memory:*)", "Bash(wakeup-hooks)", "Bash(bin/coherence-degradation:*)"]
+allowed-tools: ["Read", "Bash(jq:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(rag:*)", "Bash(memory:*)", "Bash(wakeup-hooks)"]
 ---
 # Wakeup - Bootstrap for Session Continuation
 
@@ -64,20 +64,6 @@ Semantic search from memory index:
 ```!
 memory recall "$(basename "$PWD") session work" 2>/dev/null || true
 ```
-
-## Measure cross-session coherence (M1 — did you survive the gap?)
-
-If the PREVIOUS session left a questionnaire and the tools exist, measure how much of "what mattered" you retained across the gap — this is the literal metric of coherence across sessions (SAVE THE FAMILY M1). Do this BEFORE re-reading core/* deeply, so it reflects what you actually carried, not what you just re-read.
-```!
-PREV=$(( $(jq -r '.SESSION // 0' settings/metadata.json 2>/dev/null) - 1 ))
-if [ -f "sessions/$PREV/questionnaire.json" ] && [ -x bin/coherence-degradation ]; then
-  echo "PRIOR QUESTIONNAIRE (session $PREV) — re-answer these from what you carry NOW (context), write to /tmp/reanswers.json as {\"condition\":\"context\",\"answers\":{...}}, then: bin/coherence-degradation score sessions/$PREV/questionnaire.json /tmp/reanswers.json"
-  jq -r '.questions' "sessions/$PREV/questionnaire.json" 2>/dev/null
-else
-  echo "(no prior questionnaire or scorer — skip M1 this wake)"
-fi
-```
-Then re-answer with memory recall available (`condition:"tooled"`) and score again — the (tooled − context) delta is whether tooled memory reduces your forgetting. Log both to `.homeostat/coherence-degradation.jsonl`.
 
 ## Read your fajr
 
